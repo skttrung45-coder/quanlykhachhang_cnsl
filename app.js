@@ -279,28 +279,40 @@ window.clientSideExport = async function(basePayload, currentTab) {
 };
 
 // File Upload Handler
-window.handleFileUpload = function() {
+window.handleFileUpload = async function() {
     const fileInput = document.getElementById('file-upload');
     if (!fileInput.files.length) {
-        alert("Vui lòng chọn file Excel!");
+        alert("Vui lòng chọn ít nhất một file Excel!");
         return;
     }
-    const file = fileInput.files[0];
-    const reader = new FileReader();
     
     document.getElementById('loading-overlay').classList.remove('hidden');
     document.getElementById('loading-overlay').classList.add('flex');
+    const loadingStatusText = document.getElementById('loading-status-text');
+    const loadingProgressBar = document.getElementById('loading-progress-bar');
     
-    reader.onload = async function(e) {
-        try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
+    try {
+        let combinedData = [];
+        const files = Array.from(fileInput.files);
+        
+        for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            if (loadingStatusText) loadingStatusText.innerText = `Đang đọc file ${i + 1}/${files.length}: ${file.name}`;
+            if (loadingProgressBar) loadingProgressBar.style.width = `${Math.round((i / files.length) * 100)}%`;
+            
+            const dataBuffer = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(new Uint8Array(e.target.result));
+                reader.onerror = err => reject(err);
+                reader.readAsArrayBuffer(file);
+            });
+            
+            const workbook = XLSX.read(dataBuffer, {type: 'array'});
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
             
-            // Map keys roughly
-            window.allData = jsonData.map(r => ({
+            const mappedData = jsonData.map(r => ({
                 donVi: r['donVi'] || r['Đơn vị'] || r['donvi'],
                 maKhachHang: r['maKhachHang'] || r['Mã khách hàng'],
                 tenKhachHang: r['tenKhachHang'] || r['Tên khách hàng'],
@@ -317,19 +329,31 @@ window.handleFileUpload = function() {
                 tongTien: r['tongTien'] || r['Tổng tiền'] || 0
             }));
             
-            alert("Đã nạp " + window.allData.length + " dòng dữ liệu!");
-            
-            // Reset filters & fetch
-            activeFilters = {donVi: [], maTuyenDoc: [], maPhamVi: [], mucDich: [], maDoiTuongGia: [], nam: [], thang: [], cc_thangA: []};
-            await fetchFilterOptions();
-            await applyFilters();
+            combinedData = combinedData.concat(mappedData);
+        }
+        
+        window.allData = combinedData;
+        if (loadingProgressBar) loadingProgressBar.style.width = '100%';
+        if (loadingStatusText) loadingStatusText.innerText = `Đã nạp ${window.allData.length} dòng dữ liệu!`;
+        
+        // Reset filters & fetch
+        activeFilters = {donVi: [], maTuyenDoc: [], maPhamVi: [], mucDich: [], maDoiTuongGia: [], nam: [], thang: [], cc_thangA: []};
+        await fetchFilterOptions();
+        await applyFilters();
+        
+        setTimeout(() => {
+            alert(`Đã nạp thành công ${files.length} file với tổng số ${window.allData.length} dòng dữ liệu!`);
+        }, 100);
 
-        } catch (err) {
-            alert("Lỗi nạp file: " + err);
-        } finally {
+    } catch (err) {
+        console.error("Lỗi nạp file:", err);
+        alert("Lỗi nạp file: " + err);
+    } finally {
+        setTimeout(() => {
             document.getElementById('loading-overlay').classList.add('hidden');
             document.getElementById('loading-overlay').classList.remove('flex');
-        }
-    };
-    reader.readAsArrayBuffer(file);
+            if (loadingProgressBar) loadingProgressBar.style.width = '0%';
+            if (loadingStatusText) loadingStatusText.innerText = 'Đang chuẩn bị khởi động...';
+        }, 500);
+    }
 };
