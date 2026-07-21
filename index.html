@@ -147,6 +147,9 @@
                     <button onclick="handleFileUpload()" id="btn-load-file" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm w-full">
                         Nạp File
                     </button>
+                    <button onclick="clearCache()" id="btn-clear-cache" class="bg-red-500 hover:bg-red-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm w-full hidden">
+                        Xóa Dữ liệu đã lưu
+                    </button>
                 </div>
                 <p id="folder-status-msg" class="text-[10px] text-slate-400 mt-1.5 hidden"></p>
             </div>
@@ -1386,7 +1389,29 @@
             }, 500);
         });
 
+        async function clearCache() {
+            if (confirm("Bạn có chắc chắn muốn xóa dữ liệu đã lưu?")) {
+                if (window.clearIDB) {
+                    await window.clearIDB();
+                    window.allData = [];
+                    alert("Đã xóa dữ liệu thành công. Trang web sẽ tải lại.");
+                    location.reload();
+                }
+            }
+        }
+
         async function initializeMainApp() {
+            // Check IndexedDB first
+            if (window.loadFromIDB) {
+                const cachedData = await window.loadFromIDB();
+                if (cachedData && cachedData.length > 0) {
+                    window.allData = cachedData;
+                    console.log("Loaded data from IndexedDB:", cachedData.length, "rows.");
+                    const btnClear = document.getElementById('btn-clear-cache');
+                    if (btnClear) btnClear.classList.remove('hidden');
+                }
+            }
+
             const isConnected = await checkConnection();
             if (isConnected) {
                 await fetchFilterOptions();

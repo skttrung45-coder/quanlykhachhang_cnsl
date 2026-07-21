@@ -1,4 +1,72 @@
 // Client-side data engine for Project 4 Github Pages
+// ========================
+// IndexedDB Helper
+// ========================
+const DB_NAME = 'WaterDataDB';
+const STORE_NAME = 'WaterDataStore';
+const DB_VERSION = 1;
+
+window.dbPromise = new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    request.onerror = (event) => reject(event.target.error);
+    request.onsuccess = (event) => resolve(event.target.result);
+    request.onupgradeneeded = (event) => {
+        const db = event.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+            db.createObjectStore(STORE_NAME);
+        }
+    };
+});
+
+window.saveToIDB = async function(data) {
+    try {
+        const db = await window.dbPromise;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.put(data, 'allData');
+            request.onsuccess = () => resolve();
+            request.onerror = (e) => reject(e.target.error);
+        });
+    } catch (err) {
+        console.error("Lỗi khi lưu vào IndexedDB:", err);
+    }
+};
+
+window.loadFromIDB = async function() {
+    try {
+        const db = await window.dbPromise;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.get('allData');
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = (e) => reject(e.target.error);
+        });
+    } catch (err) {
+        console.error("Lỗi khi tải từ IndexedDB:", err);
+        return null;
+    }
+};
+
+window.clearIDB = async function() {
+    try {
+        const db = await window.dbPromise;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.clear();
+            request.onsuccess = () => resolve();
+            request.onerror = (e) => reject(e.target.error);
+        });
+    } catch (err) {
+        console.error("Lỗi khi xóa IndexedDB:", err);
+    }
+};
+
+// ========================
+// Global Data Container
+// ========================
 window.allData = [];
 
 function getUniqueValues(data, field) {
@@ -312,29 +380,39 @@ window.handleFileUpload = async function() {
             const worksheet = workbook.Sheets[firstSheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
             
-            const mappedData = jsonData.map(r => ({
-                donVi: r['donVi'] || r['Đơn vị'] || r['donvi'],
-                maKhachHang: r['maKhachHang'] || r['Mã khách hàng'],
-                tenKhachHang: r['tenKhachHang'] || r['Tên khách hàng'],
-                nam: r['nam'] || r['Năm'],
-                thang: r['thang'] || r['Tháng'],
-                maTuyenDoc: r['maTuyenDoc'] || r['Mã tuyến đọc'],
-                maPhamVi: r['maPhamVi'] || r['Mã phạm vi'],
-                mucDich: r['mucDich'] || r['Mục đích SD'],
-                maDoiTuongGia: r['maDoiTuongGia'] || r['Mã đối tượng giá'],
-                tieuThu: r['tieuThu'] || r['Tiêu thụ'] || 0,
-                thanhTien: r['thanhTien'] || r['Thành tiền'] || 0,
-                phiVAT: r['phiVAT'] || r['Phí VAT'] || 0,
-                phiBVMT: r['phiBVMT'] || r['Phí BVMT'] || 0,
-                tongTien: r['tongTien'] || r['Tổng tiền'] || 0
-            }));
+            const mappedData = jsonData.map(r => {
+                let donViRaw = r['donVi'] || r['Đơn vị'] || r['donvi'] || "";
+                return {
+                    donVi: donViRaw.toString().trim().toUpperCase(),
+                    maKhachHang: r['maKhachHang'] || r['Mã khách hàng'],
+                    tenKhachHang: r['tenKhachHang'] || r['Tên khách hàng'],
+                    nam: r['nam'] || r['Năm'],
+                    thang: r['thang'] || r['Tháng'],
+                    maTuyenDoc: r['maTuyenDoc'] || r['Mã tuyến đọc'],
+                    maPhamVi: r['maPhamVi'] || r['Mã phạm vi'],
+                    mucDich: r['mucDich'] || r['Mục đích SD'],
+                    maDoiTuongGia: r['maDoiTuongGia'] || r['Mã đối tượng giá'],
+                    tieuThu: r['tieuThu'] || r['Tiêu thụ'] || 0,
+                    thanhTien: r['thanhTien'] || r['Thành tiền'] || 0,
+                    phiVAT: r['phiVAT'] || r['Phí VAT'] || 0,
+                    phiBVMT: r['phiBVMT'] || r['Phí BVMT'] || 0,
+                    tongTien: r['tongTien'] || r['Tổng tiền'] || 0
+                };
+            });
             
             combinedData = combinedData.concat(mappedData);
         }
         
         window.allData = combinedData;
+        
+        if (loadingStatusText) loadingStatusText.innerText = 'Đang lưu vào bộ nhớ đệm (IndexedDB)...';
+        await window.saveToIDB(window.allData);
+        
         if (loadingProgressBar) loadingProgressBar.style.width = '100%';
         if (loadingStatusText) loadingStatusText.innerText = `Đã nạp ${window.allData.length} dòng dữ liệu!`;
+        
+        const btnClear = document.getElementById('btn-clear-cache');
+        if (btnClear) btnClear.classList.remove('hidden');
         
         // Reset filters & fetch
         for (let key in activeFilters) {
