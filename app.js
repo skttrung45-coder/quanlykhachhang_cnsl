@@ -337,7 +337,9 @@ window.handleFileUpload = async function() {
         if (loadingStatusText) loadingStatusText.innerText = `Đã nạp ${window.allData.length} dòng dữ liệu!`;
         
         // Reset filters & fetch
-        activeFilters = {donVi: [], maTuyenDoc: [], maPhamVi: [], mucDich: [], maDoiTuongGia: [], nam: [], thang: [], cc_thangA: []};
+        for (let key in activeFilters) {
+            activeFilters[key] = [];
+        }
         await fetchFilterOptions();
         await applyFilters();
         
