@@ -852,7 +852,8 @@ window.fetchFromInputFolder = async function(silentError = false) {
 // ==========================================
 const USER_STORAGE_KEY = 'water_app_users_v1';
 const SESSION_STORAGE_KEY = 'water_app_current_user_v1';
-const SYNC_CLOUD_ENDPOINT = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019f88e790f010da';
+const JSONBLOB_ENDPOINT = 'https://jsonblob.com/api/jsonBlob/019f88ff-34af-7406-b6bc-9b1b5d53d359';
+const RESTFUL_API_ENDPOINT = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019f88e790f010da';
 
 // Multi-client broadcast channel for local network / same domain tabs
 const userBroadcastChannel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('water_app_user_channel') : null;
@@ -946,37 +947,53 @@ window.authEngine = {
     },
 
     fetchRemoteUsers: async function() {
+        // Try JsonBlob Endpoint
         try {
-            const res = await fetch(SYNC_CLOUD_ENDPOINT, { 
+            const res = await fetch(JSONBLOB_ENDPOINT, { 
+                headers: { 'Accept': 'application/json' },
                 cache: 'no-store' 
             });
             if (res.ok) {
                 const json = await res.json();
-                if (json && json.data && Array.isArray(json.data.users)) {
-                    this.mergeUsers(json.data.users);
+                if (json && Array.isArray(json.users)) {
+                    this.mergeUsers(json.users);
+                    return;
                 }
             }
         } catch (e) {
-            // Offline / silent fallback
+            // fallback
+        }
+
+        // Fallback to RestfulAPI Endpoint
+        try {
+            const res2 = await fetch(RESTFUL_API_ENDPOINT, { cache: 'no-store' });
+            if (res2.ok) {
+                const json2 = await res2.json();
+                if (json2 && json2.data && Array.isArray(json2.data.users)) {
+                    this.mergeUsers(json2.data.users);
+                }
+            }
+        } catch (e) {
+            // silent fallback
         }
     },
 
     pushRemoteUsers: async function(users) {
-        try {
-            const payload = {
-                name: 'WaterAppUsers',
-                data: { users: users, updatedAt: new Date().toISOString() }
-            };
-            await fetch(SYNC_CLOUD_ENDPOINT, {
+        const jsonBlobPayload = JSON.stringify({ name: 'WaterAppUsers', users: users, updatedAt: new Date().toISOString() });
+        const restfulPayload = JSON.stringify({ name: 'WaterAppUsers', data: { users: users, updatedAt: new Date().toISOString() } });
+
+        Promise.allSettled([
+            fetch(JSONBLOB_ENDPOINT, {
                 method: 'PUT',
-                headers: { 
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(payload)
-            });
-        } catch (e) {
-            // Offline / silent fallback
-        }
+                headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                body: jsonBlobPayload
+            }),
+            fetch(RESTFUL_API_ENDPOINT, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: restfulPayload
+            })
+        ]).catch(() => {});
     },
 
     getCurrentUser: function() {
