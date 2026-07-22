@@ -1,2 +1,2 @@
-# Qu-n-l-kh-ch-h-ng
+# QLKH
 Nguồn quản lý
