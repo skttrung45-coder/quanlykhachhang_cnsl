@@ -503,6 +503,65 @@ function buildMonthlyMatrixSheet(df, valueKey) {
     return ws;
 }
 
+function buildDonViMonthlyMatrixSheet(df, valueKey) {
+    const donViList = Array.from(new Set(df.map(r => r.donVi).filter(d => d))).sort((a, b) => a.localeCompare(b, 'vi', { numeric: true }));
+    
+    const headers = ['Đơn vị'];
+    for (let m = 1; m <= 12; m++) {
+        headers.push(`Tháng ${m < 10 ? '0' + m : m}`);
+    }
+    headers.push('Tổng');
+
+    const rows = [headers];
+
+    const aggMap = {};
+    donViList.forEach(d => {
+        aggMap[d] = {};
+        for (let m = 1; m <= 12; m++) {
+            aggMap[d][m] = 0;
+        }
+    });
+
+    df.forEach(r => {
+        if (r.donVi && aggMap[r.donVi] && r.thang >= 1 && r.thang <= 12) {
+            aggMap[r.donVi][r.thang] += parseNum(r[valueKey]);
+        }
+    });
+
+    const monthTotals = Array(13).fill(0);
+    let grandTotal = 0;
+
+    donViList.forEach(d => {
+        const row = [d];
+        let rowSum = 0;
+        for (let m = 1; m <= 12; m++) {
+            const val = aggMap[d][m];
+            row.push(val);
+            rowSum += val;
+            monthTotals[m] += val;
+        }
+        row.push(rowSum);
+        grandTotal += rowSum;
+        rows.push(row);
+    });
+
+    const totalRow = ['Tổng'];
+    for (let m = 1; m <= 12; m++) {
+        totalRow.push(monthTotals[m]);
+    }
+    totalRow.push(grandTotal);
+    rows.push(totalRow);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    const colWidths = [{ wch: 16 }];
+    for (let m = 1; m <= 12; m++) colWidths.push({ wch: 14 });
+    colWidths.push({ wch: 16 });
+    ws['!cols'] = colWidths;
+
+    return ws;
+}
+
 window.clientSideExport = async function(basePayload, currentTab) {
     const filename = currentTab === 'summary' 
         ? `bao_cao_tong_hop_${new Date().toISOString().slice(0,10)}.xlsx` 
@@ -533,14 +592,32 @@ window.clientSideExport = async function(basePayload, currentTab) {
     const wb = XLSX.utils.book_new();
     if (currentTab === 'summary') {
         const dfFiltered = q.detail_records || [];
+        const years = Array.from(new Set(dfFiltered.map(r => r.nam))).filter(y => y > 0).sort((a, b) => a - b);
 
-        // 1. Matrix sheet cho Sản lượng theo tháng x năm
-        const wsSL = buildMonthlyMatrixSheet(dfFiltered, 'tieuThu');
-        XLSX.utils.book_append_sheet(wb, wsSL, "San_Luong_Theo_Thang");
+        // 1. Matrix theo đơn vị x tháng cho Sản lượng & Doanh thu
+        if (years.length <= 1) {
+            const wsSLDonVi = buildDonViMonthlyMatrixSheet(dfFiltered, 'tieuThu');
+            XLSX.utils.book_append_sheet(wb, wsSLDonVi, "SL_Theo_Don_Vi");
 
-        // 2. Matrix sheet cho Doanh thu theo tháng x năm
-        const wsDT = buildMonthlyMatrixSheet(dfFiltered, 'tongTien');
-        XLSX.utils.book_append_sheet(wb, wsDT, "Doanh_Thu_Theo_Thang");
+            const wsDTDonVi = buildDonViMonthlyMatrixSheet(dfFiltered, 'tongTien');
+            XLSX.utils.book_append_sheet(wb, wsDTDonVi, "DT_Theo_Don_Vi");
+        } else {
+            years.forEach(y => {
+                const dfYear = dfFiltered.filter(r => r.nam === y);
+                const wsSLDonVi = buildDonViMonthlyMatrixSheet(dfYear, 'tieuThu');
+                XLSX.utils.book_append_sheet(wb, wsSLDonVi, `SL_Don_Vi_${y}`);
+
+                const wsDTDonVi = buildDonViMonthlyMatrixSheet(dfYear, 'tongTien');
+                XLSX.utils.book_append_sheet(wb, wsDTDonVi, `DT_Don_Vi_${y}`);
+            });
+        }
+
+        // 2. Matrix theo tháng x năm cho Sản lượng & Doanh thu
+        const wsSLThang = buildMonthlyMatrixSheet(dfFiltered, 'tieuThu');
+        XLSX.utils.book_append_sheet(wb, wsSLThang, "San_Luong_Theo_Thang");
+
+        const wsDTThang = buildMonthlyMatrixSheet(dfFiltered, 'tongTien');
+        XLSX.utils.book_append_sheet(wb, wsDTThang, "Doanh_Thu_Theo_Thang");
 
         // 3. Sheet thống kê gom nhóm chi tiết
         if (q.grouped_records && q.grouped_records.length > 0) {
