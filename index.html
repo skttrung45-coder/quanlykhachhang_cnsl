@@ -213,8 +213,8 @@
 
             <!-- Top Action Toolbar -->
             <div class="bg-slate-50 p-4 border-b flex flex-wrap justify-between items-center gap-3 text-xs">
-                <div class="flex items-center gap-3">
-                    <span class="font-bold text-slate-700">Tệp dữ liệu người dùng (User Data):</span>
+                <div class="flex flex-wrap items-center gap-2">
+                    <span class="font-bold text-slate-700 mr-1">Tệp / Dữ liệu người dùng:</span>
                     <button onclick="authEngine.exportUserData()" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm">
                         📥 Xuất user_data.json
                     </button>
@@ -222,6 +222,9 @@
                         📤 Nạp user_data.json
                         <input type="file" accept=".json" onchange="handleImportUserDataFile(event)" class="hidden">
                     </label>
+                    <button onclick="promptImportUserCode()" class="bg-purple-700 hover:bg-purple-800 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm" title="Dán mã đăng ký tài khoản từ máy khách">
+                        📋 Dán mã từ máy khách
+                    </button>
                 </div>
                 <div class="flex gap-2">
                     <span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full font-bold border border-amber-200">
@@ -1898,6 +1901,30 @@
                 }
             };
             reader.readAsText(file);
+        }
+
+        function promptImportUserCode() {
+            const code = prompt("Dán mã JSON đăng ký tài khoản từ máy khách:");
+            if (code && code.trim()) {
+                try {
+                    const data = JSON.parse(code.trim());
+                    const users = Array.isArray(data) ? data : (data.users ? data.users : [data]);
+                    authEngine.mergeUsers(users);
+                    authEngine.saveUsers(authEngine.getUsers());
+                    alert("Đã nhận và lưu yêu cầu phê duyệt thành công!");
+                    renderAdminUserTables();
+                } catch (e) {
+                    alert("Mã dữ liệu không hợp lệ. Vui lòng kiểm tra lại!");
+                }
+            }
+        }
+
+        // Tự động kiểm tra và đồng bộ yêu cầu tài khoản mới từ máy khách theo chu kỳ 4 giây
+        if (window.authEngine && window.authEngine.fetchRemoteUsers) {
+            window.authEngine.fetchRemoteUsers();
+            setInterval(() => {
+                window.authEngine.fetchRemoteUsers();
+            }, 4000);
         }
 
         async function initializeMainApp() {

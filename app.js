@@ -852,6 +852,22 @@ window.fetchFromInputFolder = async function(silentError = false) {
 // ==========================================
 const USER_STORAGE_KEY = 'water_app_users_v1';
 const SESSION_STORAGE_KEY = 'water_app_current_user_v1';
+const SYNC_CLOUD_ENDPOINT = 'https://api.restful-api.dev/objects/ff8081819f7e10ae019f88e790f010da';
+
+// Multi-client broadcast channel for local network / same domain tabs
+const userBroadcastChannel = (typeof BroadcastChannel !== 'undefined') ? new BroadcastChannel('water_app_user_channel') : null;
+
+if (userBroadcastChannel) {
+    userBroadcastChannel.onmessage = (event) => {
+        if (event.data && event.data.type === 'USER_UPDATED') {
+            if (window.authEngine) {
+                window.authEngine.getUsers();
+                if (typeof updateAdminPendingBadge === 'function') updateAdminPendingBadge();
+                if (typeof renderAdminUserTables === 'function') renderAdminUserTables();
+            }
+        }
+    };
+}
 
 // Default Admin Account as per requirement (Password: "170101")
 const DEFAULT_ADMIN = {
@@ -872,12 +888,12 @@ window.authEngine = {
             const adminIdx = users.findIndex(u => u.username.toLowerCase() === 'admin');
             if (adminIdx === -1) {
                 users.unshift({ ...DEFAULT_ADMIN });
-                this.saveUsers(users);
+                this.saveUsers(users, true);
             } else {
                 // Ensure default admin password is 170101 if unset
                 if (!users[adminIdx].password) {
                     users[adminIdx].password = '170101';
-                    this.saveUsers(users);
+                    this.saveUsers(users, true);
                 }
             }
             return users;
@@ -887,12 +903,81 @@ window.authEngine = {
         }
     },
 
-    saveUsers: function(users) {
+    saveUsers: function(users, skipPushRemote = false) {
         try {
             localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(users));
             window.saveUsersToIDB(users).catch(() => {});
+            if (userBroadcastChannel) {
+                userBroadcastChannel.postMessage({ type: 'USER_UPDATED', timestamp: Date.now() });
+            }
+            if (!skipPushRemote) {
+                this.pushRemoteUsers(users).catch(() => {});
+            }
         } catch (e) {
             console.error("Lỗi lưu người dùng vào localStorage:", e);
+        }
+    },
+
+    mergeUsers: function(remoteUsers) {
+        if (!Array.isArray(remoteUsers) || remoteUsers.length === 0) return false;
+        let current = this.getUsers();
+        let changed = false;
+
+        remoteUsers.forEach(ru => {
+            if (!ru || !ru.username) return;
+            const idx = current.findIndex(c => c.username.toLowerCase() === ru.username.toLowerCase());
+            if (idx === -1) {
+                current.push(ru);
+                changed = true;
+            } else {
+                if (current[idx].status !== ru.status || current[idx].password !== ru.password) {
+                    current[idx] = { ...current[idx], ...ru };
+                    changed = true;
+                }
+            }
+        });
+
+        if (changed) {
+            this.saveUsers(current, true);
+            if (typeof updateAdminPendingBadge === 'function') updateAdminPendingBadge();
+            if (typeof renderAdminUserTables === 'function') renderAdminUserTables();
+        }
+        return changed;
+    },
+
+    fetchRemoteUsers: async function() {
+        try {
+            const res = await fetch(SYNC_CLOUD_ENDPOINT, { 
+                headers: { 'User-Agent': 'Mozilla/5.0' },
+                cache: 'no-store' 
+            });
+            if (res.ok) {
+                const json = await res.json();
+                if (json && json.data && Array.isArray(json.data.users)) {
+                    this.mergeUsers(json.data.users);
+                }
+            }
+        } catch (e) {
+            // Offline / silent fallback
+        }
+    },
+
+    pushRemoteUsers: async function(users) {
+        try {
+            const payload = {
+                name: 'WaterAppUsers',
+                data: { users: users, updatedAt: new Date().toISOString() }
+            };
+            await fetch(SYNC_CLOUD_ENDPOINT, {
+                method: 'PUT',
+                headers: { 
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0'
+                },
+                body: JSON.stringify(payload)
+            });
+        } catch (e) {
+            // Offline / silent fallback
         }
     },
 
