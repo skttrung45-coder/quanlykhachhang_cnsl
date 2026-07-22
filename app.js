@@ -239,29 +239,53 @@ window.mockApiQuery = function(payload) {
     const validGroups = ['donVi', 'maTuyenDoc', 'maPhamVi', 'mucDich', 'maDoiTuongGia', 'nam', 'thang', 'banNien'];
     if (!validGroups.includes(groupCol)) groupCol = 'donVi';
     
-    let yoy_metadata = null;
-    let stat_grouped = [];
+    const availableYears = Array.from(new Set(df.map(r => r.nam))).filter(y => y > 0).sort((a,b) => b - a);
+    let year_now = availableYears[0] || 0;
+    let year_prev = availableYears[1] || 0;
     
+    // Find months present in year_now (target year)
+    let months_now = new Set();
+    if (year_now > 0) {
+        df.filter(r => r.nam === year_now).forEach(r => {
+            if (r.thang > 0) months_now.add(r.thang);
+        });
+    }
+
+    if (year_now > 0 && year_prev > 0) {
+        yoy_metadata = { year_now, year_prev, months_now: Array.from(months_now).sort((a,b)=>a-b) };
+    }
+
     if (df.length > 0) {
         if (groupCol === 'banNien') {
             df = df.map(r => ({...r, banNien: r.thang <= 6 ? '6 Tháng đầu năm (H1)' : '6 Tháng cuối năm (H2)'}));
         }
 
+        // For YoY comparison: filter year_prev rows to ONLY include months present in year_now
+        let dfComparable = df;
+        if (yoy_metadata && months_now.size > 0) {
+            dfComparable = df.filter(r => {
+                if (r.nam === year_prev) {
+                    return months_now.has(r.thang);
+                }
+                return true;
+            });
+        }
+
         let maxThangCache = {};
         if (groupCol === 'banNien') {
-            df.forEach(r => {
+            dfComparable.forEach(r => {
                 const key = r.nam + '_' + r.banNien;
                 if (!maxThangCache[key] || r.thang > maxThangCache[key]) maxThangCache[key] = r.thang;
             });
         } else if (groupCol !== 'thang') {
-            df.forEach(r => {
+            dfComparable.forEach(r => {
                 const key = r.nam;
                 if (!maxThangCache[key] || r.thang > maxThangCache[key]) maxThangCache[key] = r.thang;
             });
         }
 
         const groups = {};
-        df.forEach(r => {
+        dfComparable.forEach(r => {
             const groupKey = groupCol === 'nam' ? r.nam : (r[groupCol] + '|' + r.nam);
             if (!groups[groupKey]) {
                 groups[groupKey] = {
@@ -271,16 +295,16 @@ window.mockApiQuery = function(payload) {
                     khSet: new Set()
                 };
             }
-            groups[groupKey].tieuThu += r.tieuThu || 0;
-            groups[groupKey].thanhTien += r.thanhTien || 0;
-            groups[groupKey].tongTien += r.tongTien || 0;
+            groups[groupKey].tieuThu += parseNum(r.tieuThu);
+            groups[groupKey].thanhTien += parseNum(r.thanhTien);
+            groups[groupKey].tongTien += parseNum(r.tongTien);
             
             let isMaxMonth = false;
             if (groupCol === 'thang') isMaxMonth = true;
             else if (groupCol === 'banNien') isMaxMonth = (r.thang === maxThangCache[r.nam + '_' + r.banNien]);
             else isMaxMonth = (r.thang === maxThangCache[r.nam]);
 
-            if (isMaxMonth) {
+            if (isMaxMonth && r.maKhachHang) {
                 groups[groupKey].khSet.add(r.maKhachHang);
             }
         });
@@ -292,12 +316,7 @@ window.mockApiQuery = function(payload) {
         });
 
         if (groupCol !== 'nam') {
-            const years = Array.from(new Set(stat_df.map(g => g.nam))).sort((a,b)=>b-a);
-            if (years.length >= 2) {
-                const year_now = years[0];
-                const year_prev = years[1];
-                yoy_metadata = { year_now, year_prev };
-
+            if (yoy_metadata) {
                 const pivot = {};
                 stat_df.forEach(g => {
                     const gVal = g[groupCol];
@@ -308,15 +327,24 @@ window.mockApiQuery = function(payload) {
                         pivot[gVal].tieuThu = g.tieuThu;
                         pivot[gVal].thanhTien = g.thanhTien;
                         pivot[gVal].tongTien = g.tongTien;
+                        pivot[gVal].hasDataNow = true;
                     } else if (g.nam === year_prev) {
                         pivot[gVal].soKhachHang_prev = g.soKhachHang;
                         pivot[gVal].tieuThu_prev = g.tieuThu;
                         pivot[gVal].thanhTien_prev = g.thanhTien;
                         pivot[gVal].tongTien_prev = g.tongTien;
+                        pivot[gVal].hasDataPrev = true;
                     }
                 });
                 
-                stat_grouped = Object.values(pivot).map(p => {
+                let resList = Object.values(pivot);
+
+                // If grouping by month, ONLY include months that exist in year_now (do not show missing future months!)
+                if (groupCol === 'thang') {
+                    resList = resList.filter(p => p.hasDataNow);
+                }
+
+                stat_grouped = resList.map(p => {
                     p.soKhachHang = p.soKhachHang || 0;
                     p.tieuThu = p.tieuThu || 0;
                     p.thanhTien = p.thanhTien || 0;
@@ -328,6 +356,7 @@ window.mockApiQuery = function(payload) {
                     if (groupCol === 'thang') p.nam = year_now;
                     return p;
                 });
+
                 if (groupCol === 'thang') stat_grouped.sort((a,b) => a[groupCol] - b[groupCol]);
             } else {
                 stat_grouped = stat_df.sort((a,b) => {

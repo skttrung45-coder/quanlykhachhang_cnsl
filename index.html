@@ -1138,22 +1138,24 @@
                         
                         if (!valPrev || valPrev === 0) {
                             return `
-                                <div>${formatted}</div>
-                                <div class="text-[10px] text-slate-400 mt-1">N/A (Năm ${yoyMeta.year_prev})</div>
+                                <div class="font-medium">${formatted}</div>
+                                <div class="text-[11px] text-slate-400 mt-0.5">Kỳ trước: N/A</div>
                             `;
                         }
                         
                         const pct = ((valNow - valPrev) / valPrev) * 100;
                         const isUp = pct > 0;
                         const isDown = pct < 0;
-                        const colorClass = isUp ? 'text-emerald-700 bg-emerald-100/70 border border-emerald-200' : (isDown ? 'text-red-700 bg-red-100/70 border border-red-200' : 'text-slate-600 bg-slate-100 border border-slate-200');
+                        const colorClass = isUp ? 'text-emerald-700 bg-emerald-100/80 border border-emerald-200' : (isDown ? 'text-red-700 bg-red-100/80 border border-red-200' : 'text-slate-600 bg-slate-100 border border-slate-200');
                         const icon = isUp ? '▲' : (isDown ? '▼' : '−');
+                        const sign = isUp ? '+' : '';
                         
                         return `
-                            <div>${formatted}</div>
-                            <div class="mt-1 flex justify-end">
-                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClass}" title="So với năm ${yoyMeta.year_prev} (${formatFn(valPrev)})">
-                                    ${icon} ${Math.abs(pct).toFixed(1)}%
+                            <div class="font-medium text-slate-900">${formatted}</div>
+                            <div class="mt-1 flex items-center justify-end gap-1.5 text-[11px]">
+                                <span class="text-slate-500 font-normal">Kỳ trước (${yoyMeta.year_prev}): <strong class="text-slate-700 font-semibold">${formatFn(valPrev)}</strong></span>
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${colorClass}">
+                                    ${icon} ${sign}${pct.toFixed(1)}%
                                 </span>
                             </div>
                         `;
