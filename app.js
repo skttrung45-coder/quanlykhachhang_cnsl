@@ -64,6 +64,68 @@ window.clearIDB = async function() {
     }
 };
 
+// Helper utilities for data parsing
+function getRowVal(r, keys) {
+    for (let k of keys) {
+        if (r[k] !== undefined && r[k] !== null && r[k] !== "") {
+            return r[k];
+        }
+    }
+    return undefined;
+}
+
+function parseNum(val) {
+    if (val === null || val === undefined || val === '') return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    let str = val.toString().trim().replace(/,/g, '');
+    let n = parseFloat(str);
+    return isNaN(n) ? 0 : n;
+}
+
+function parseIntNum(val) {
+    let n = parseNum(val);
+    return Math.round(n);
+}
+
+function mapExcelRow(r) {
+    let donViRaw = getRowVal(r, ['donVi', 'Đơn vị', 'donvi', 'ĐƠN VỊ', 'ĐV']) || "";
+    let maKH = getRowVal(r, ['maKhachHang', 'Mã khách hàng', 'Mã KH', 'MA_KH', 'makhachhang']) || "";
+    let tenKH = getRowVal(r, ['tenKhachHang', 'Tên khách hàng', 'Tên KH', 'TEN_KH', 'tenkhachhang']) || "";
+    let nam = parseIntNum(getRowVal(r, ['nam', 'Năm', 'NAM']));
+    let thang = parseIntNum(getRowVal(r, ['thang', 'Tháng', 'THANG']));
+    let maTuyen = getRowVal(r, ['maTuyenDoc', 'Mã tuyến đọc', 'Mã tuyến', 'Tuyến đọc', 'matuyendoc']) || "";
+    let maPhamVi = getRowVal(r, ['maPhamVi', 'Mã phạm vi', 'Phạm vi', 'maphamvi']) || "";
+    let mucDich = getRowVal(r, ['mucDich', 'Mục đích SD', 'Mục đích sử dụng', 'Mục đích', 'mucdich']) || "";
+    let maDoiTuongGia = getRowVal(r, ['maDoiTuongGia', 'Mã đối tượng giá', 'Đối tượng giá', 'Mức giá', 'madoituonggia']) || "";
+    
+    let tieuThu = parseNum(getRowVal(r, ['tieuThu', 'Tiêu thụ', 'Sản lượng', 'SL', 'tieuthu']));
+    let thanhTien = parseNum(getRowVal(r, ['thanhTien', 'Thành tiền', 'Thành Tiền', 'thanhtien']));
+    let phiVAT = parseNum(getRowVal(r, ['phiVAT', 'Phí VAT', 'VAT', 'phivat']));
+    let phiBVMT = parseNum(getRowVal(r, ['phiBVMT', 'Phí BVMT', 'BVMT', 'Phí bảo vệ môi trường', 'phibvmt']));
+    let tongTien = parseNum(getRowVal(r, ['tongTien', 'Tổng tiền', 'Tổng cộng', 'TongTien', 'tongtien']));
+    
+    if (tongTien === 0 && (thanhTien > 0 || phiVAT > 0 || phiBVMT > 0)) {
+        tongTien = thanhTien + phiVAT + phiBVMT;
+    }
+
+    return {
+        donVi: donViRaw.toString().trim().toUpperCase(),
+        maKhachHang: maKH.toString().trim(),
+        tenKhachHang: tenKH.toString().trim(),
+        nam,
+        thang,
+        maTuyenDoc: maTuyen.toString().trim(),
+        maPhamVi: maPhamVi.toString().trim(),
+        mucDich: mucDich.toString().trim(),
+        maDoiTuongGia: maDoiTuongGia.toString().trim(),
+        tieuThu,
+        thanhTien,
+        phiVAT,
+        phiBVMT,
+        tongTien
+    };
+}
+
 // ========================
 // Global Data Container
 // ========================
@@ -117,11 +179,11 @@ window.mockApiQuery = function(payload) {
 
     let tongSảnLượng = 0, tongThànhTiền = 0, tongVAT = 0, tongPhíBVMT = 0, tongTiền = 0;
     df.forEach(r => {
-        tongSảnLượng += r.tieuThu || 0;
-        tongThànhTiền += r.thanhTien || 0;
-        tongVAT += r.phiVAT || 0;
-        tongPhíBVMT += r.phiBVMT || 0;
-        tongTiền += r.tongTien || 0;
+        tongSảnLượng += parseNum(r.tieuThu);
+        tongThànhTiền += parseNum(r.thanhTien);
+        tongVAT += parseNum(r.phiVAT);
+        tongPhíBVMT += parseNum(r.phiBVMT);
+        tongTiền += parseNum(r.tongTien);
     });
 
     let tongKháchHàng = 0;
@@ -405,25 +467,7 @@ window.handleFileUpload = async function() {
             const worksheet = workbook.Sheets[firstSheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
             
-            const mappedData = jsonData.map(r => {
-                let donViRaw = r['donVi'] || r['Đơn vị'] || r['donvi'] || "";
-                return {
-                    donVi: donViRaw.toString().trim().toUpperCase(),
-                    maKhachHang: r['maKhachHang'] || r['Mã khách hàng'],
-                    tenKhachHang: r['tenKhachHang'] || r['Tên khách hàng'],
-                    nam: r['nam'] || r['Năm'],
-                    thang: r['thang'] || r['Tháng'],
-                    maTuyenDoc: r['maTuyenDoc'] || r['Mã tuyến đọc'],
-                    maPhamVi: r['maPhamVi'] || r['Mã phạm vi'],
-                    mucDich: r['mucDich'] || r['Mục đích SD'],
-                    maDoiTuongGia: r['maDoiTuongGia'] || r['Mã đối tượng giá'],
-                    tieuThu: r['tieuThu'] || r['Tiêu thụ'] || 0,
-                    thanhTien: r['thanhTien'] || r['Thành tiền'] || 0,
-                    phiVAT: r['phiVAT'] || r['Phí VAT'] || 0,
-                    phiBVMT: r['phiBVMT'] || r['Phí BVMT'] || 0,
-                    tongTien: r['tongTien'] || r['Tổng tiền'] || 0
-                };
-            });
+            const mappedData = jsonData.map(mapExcelRow);
             
             combinedData = combinedData.concat(mappedData);
         }
@@ -497,25 +541,7 @@ window.fetchFromInputFolder = async function(silentError = false) {
             const worksheet = workbook.Sheets[firstSheetName];
             const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
             
-            const mappedData = jsonData.map(r => {
-                let donViRaw = r['donVi'] || r['Đơn vị'] || r['donvi'] || "";
-                return {
-                    donVi: donViRaw.toString().trim().toUpperCase(),
-                    maKhachHang: r['maKhachHang'] || r['Mã khách hàng'],
-                    tenKhachHang: r['tenKhachHang'] || r['Tên khách hàng'],
-                    nam: r['nam'] || r['Năm'],
-                    thang: r['thang'] || r['Tháng'],
-                    maTuyenDoc: r['maTuyenDoc'] || r['Mã tuyến đọc'],
-                    maPhamVi: r['maPhamVi'] || r['Mã phạm vi'],
-                    mucDich: r['mucDich'] || r['Mục đích SD'],
-                    maDoiTuongGia: r['maDoiTuongGia'] || r['Mã đối tượng giá'],
-                    tieuThu: r['tieuThu'] || r['Tiêu thụ'] || 0,
-                    thanhTien: r['thanhTien'] || r['Thành tiền'] || 0,
-                    phiVAT: r['phiVAT'] || r['Phí VAT'] || 0,
-                    phiBVMT: r['phiBVMT'] || r['Phí BVMT'] || 0,
-                    tongTien: r['tongTien'] || r['Tổng tiền'] || 0
-                };
-            });
+            const mappedData = jsonData.map(mapExcelRow);
             
             combinedData = combinedData.concat(mappedData);
         }

@@ -635,14 +635,24 @@
             }
         }
 
+        function safeParseNum(val) {
+            if (val === null || val === undefined || val === '') return 0;
+            if (typeof val === 'number') return isNaN(val) ? 0 : val;
+            let str = val.toString().trim().replace(/,/g, '');
+            let n = parseFloat(str);
+            return isNaN(n) ? 0 : n;
+        }
+
         // Helper to format currency
         function formatVND(value) {
-            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
+            const num = safeParseNum(value);
+            return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(num);
         }
 
         // Helper to format cubic meters
         function formatM3(value) {
-            return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(value) + ' m³';
+            const num = safeParseNum(value);
+            return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(num) + ' m³';
         }
 
         // Run checking of connection on load
