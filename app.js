@@ -346,6 +346,32 @@ window.clientSideExport = async function(basePayload, currentTab) {
     XLSX.writeFile(wb, filename);
 };
 
+// Overlay Helpers
+window.showLoading = function(statusText = '') {
+    const overlay = document.getElementById('loading-overlay');
+    if (!overlay) return;
+    overlay.classList.remove('hidden', 'opacity-0');
+    overlay.classList.add('flex');
+    if (statusText) {
+        const textEl = document.getElementById('loading-status-text');
+        if (textEl) textEl.innerText = statusText;
+    }
+};
+
+window.hideLoading = function() {
+    const overlay = document.getElementById('loading-overlay');
+    if (!overlay) return;
+    overlay.classList.add('opacity-0');
+    setTimeout(() => {
+        overlay.classList.remove('flex');
+        overlay.classList.add('hidden');
+        const progressBar = document.getElementById('loading-progress-bar');
+        if (progressBar) progressBar.style.width = '0%';
+        const textEl = document.getElementById('loading-status-text');
+        if (textEl) textEl.innerText = 'Đang chuẩn bị khởi động...';
+    }, 500);
+};
+
 // File Upload Handler
 window.handleFileUpload = async function() {
     const fileInput = document.getElementById('file-upload');
@@ -354,8 +380,7 @@ window.handleFileUpload = async function() {
         return;
     }
     
-    document.getElementById('loading-overlay').classList.remove('hidden');
-    document.getElementById('loading-overlay').classList.add('flex');
+    window.showLoading('Đang đọc các file...');
     const loadingStatusText = document.getElementById('loading-status-text');
     const loadingProgressBar = document.getElementById('loading-progress-bar');
     
@@ -366,7 +391,7 @@ window.handleFileUpload = async function() {
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             if (loadingStatusText) loadingStatusText.innerText = `Đang đọc file ${i + 1}/${files.length}: ${file.name}`;
-            if (loadingProgressBar) loadingProgressBar.style.width = `${Math.round((i / files.length) * 100)}%`;
+            if (loadingProgressBar) loadingProgressBar.style.width = `${Math.round(((i + 1) / files.length) * 100)}%`;
             
             const dataBuffer = await new Promise((resolve, reject) => {
                 const reader = new FileReader();
@@ -429,24 +454,17 @@ window.handleFileUpload = async function() {
         console.error("Lỗi nạp file:", err);
         alert("Lỗi nạp file: " + err);
     } finally {
-        setTimeout(() => {
-            document.getElementById('loading-overlay').classList.add('hidden');
-            document.getElementById('loading-overlay').classList.remove('flex');
-            if (loadingProgressBar) loadingProgressBar.style.width = '0%';
-            if (loadingStatusText) loadingStatusText.innerText = 'Đang chuẩn bị khởi động...';
-        }, 500);
+        window.hideLoading();
     }
 };
 
 // Fetch from Github /input folder
 window.fetchFromInputFolder = async function(silentError = false) {
-    document.getElementById('loading-overlay').classList.remove('hidden');
-    document.getElementById('loading-overlay').classList.add('flex');
+    window.showLoading('Đang kiểm tra thư mục input trên kho lưu trữ...');
     const loadingStatusText = document.getElementById('loading-status-text');
     const loadingProgressBar = document.getElementById('loading-progress-bar');
     
     try {
-        if (loadingStatusText) loadingStatusText.innerText = 'Đang kiểm tra thư mục input trên kho lưu trữ...';
         if (loadingProgressBar) loadingProgressBar.style.width = '10%';
 
         const response = await fetch('input/list.json');
@@ -464,9 +482,10 @@ window.fetchFromInputFolder = async function(silentError = false) {
         for (let i = 0; i < fileList.length; i++) {
             const fileName = fileList[i];
             if (loadingStatusText) loadingStatusText.innerText = `Đang tải file ${i + 1}/${fileList.length}: ${fileName}`;
-            if (loadingProgressBar) loadingProgressBar.style.width = `${10 + Math.round((i / fileList.length) * 80)}%`;
+            if (loadingProgressBar) loadingProgressBar.style.width = `${10 + Math.round(((i + 1) / fileList.length) * 80)}%`;
             
-            const fileResponse = await fetch(`input/${fileName}`);
+            // Use encodeURIComponent to support filenames with spaces and accents
+            const fileResponse = await fetch(`input/${encodeURIComponent(fileName)}`);
             if (!fileResponse.ok) {
                 console.error(`Không thể tải file: input/${fileName}`);
                 continue;
@@ -527,6 +546,8 @@ window.fetchFromInputFolder = async function(silentError = false) {
             alert(`Đã đồng bộ tự động ${fileList.length} file với tổng số ${window.allData.length} dòng dữ liệu!`);
         }, 100);
 
+        return true;
+
     } catch (err) {
         console.error("Lỗi đồng bộ tự động:", err);
         if (!silentError) {
@@ -534,12 +555,6 @@ window.fetchFromInputFolder = async function(silentError = false) {
         }
         return false;
     } finally {
-        setTimeout(() => {
-            document.getElementById('loading-overlay').classList.add('hidden');
-            document.getElementById('loading-overlay').classList.remove('flex');
-            if (loadingProgressBar) loadingProgressBar.style.width = '0%';
-            if (loadingStatusText) loadingStatusText.innerText = 'Đang chuẩn bị khởi động...';
-        }, 500);
+        window.hideLoading();
     }
-    return true;
 };

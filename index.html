@@ -1374,18 +1374,13 @@
 
         // Initialization and Loading Polling
         window.addEventListener('DOMContentLoaded', () => {
-            const overlay = document.getElementById('loading-overlay');
             const progressBar = document.getElementById('loading-progress-bar');
-            
-            // Client-side execution without backend server
-            progressBar.style.width = '100%';
+            if (progressBar) progressBar.style.width = '100%';
             setTimeout(() => {
-                overlay.classList.add('opacity-0');
-                setTimeout(() => {
-                    overlay.classList.add('hidden');
-                    // Init main app data
-                    initializeMainApp();
-                }, 700);
+                if (window.hideLoading) {
+                    window.hideLoading();
+                }
+                initializeMainApp();
             }, 500);
         });
 
