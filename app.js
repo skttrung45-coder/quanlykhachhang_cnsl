@@ -369,16 +369,22 @@ window.mockApiQuery = function(payload) {
         }
     }
 
-    const limit = payload.limit || 50;
-    const offset = payload.offset || 0;
+    const pageSize = payload.pageSize || 100;
+    const page = payload.page || 1;
+    const limit = payload.limit !== undefined ? payload.limit : pageSize;
+    const offset = payload.offset !== undefined ? payload.offset : (page - 1) * pageSize;
+    
     const detail_records = df.slice(offset, offset + limit);
+    const totalPages = Math.ceil(df.length / pageSize) || 1;
 
     return {
         summary,
         grouped_records: stat_grouped,
         detail_records,
         yoy_metadata,
-        total_detail: df.length
+        total_detail: df.length,
+        currentPage: page,
+        totalPages: totalPages
     };
 };
 
