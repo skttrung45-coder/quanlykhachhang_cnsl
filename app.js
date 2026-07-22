@@ -948,7 +948,6 @@ window.authEngine = {
     fetchRemoteUsers: async function() {
         try {
             const res = await fetch(SYNC_CLOUD_ENDPOINT, { 
-                headers: { 'User-Agent': 'Mozilla/5.0' },
                 cache: 'no-store' 
             });
             if (res.ok) {
@@ -971,8 +970,7 @@ window.authEngine = {
             await fetch(SYNC_CLOUD_ENDPOINT, {
                 method: 'PUT',
                 headers: { 
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'Mozilla/5.0'
+                    'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(payload)
             });
@@ -1033,7 +1031,10 @@ window.authEngine = {
         return { success: true, user: user };
     },
 
-    register: function(fullName, username, password) {
+    register: async function(fullName, username, password) {
+        // Synchronize remote users first to avoid overwriting existing requests
+        await this.fetchRemoteUsers();
+
         const users = this.getUsers();
         const uname = (username || '').trim().toLowerCase();
         const fname = (fullName || '').trim();
@@ -1058,26 +1059,36 @@ window.authEngine = {
 
         users.push(newUser);
         this.saveUsers(users);
+        await this.pushRemoteUsers(users);
 
         return { success: true, message: 'Đăng ký thành công! Tài khoản của bạn đang chờ Admin phê duyệt.' };
     },
 
-    approveUser: function(username) {
+    approveUser: async function(username) {
+        await this.fetchRemoteUsers();
         const users = this.getUsers();
         const idx = users.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
         if (idx >= 0) {
             users[idx].status = 'approved';
             this.saveUsers(users);
+            await this.pushRemoteUsers(users);
             return true;
         }
         return false;
     },
 
-    rejectUser: function(username) {
+    rejectUser: async function(username) {
+        await this.fetchRemoteUsers();
         const users = this.getUsers();
         const idx = users.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
         if (idx >= 0) {
             users[idx].status = 'rejected';
+            this.saveUsers(users);
+            await this.pushRemoteUsers(users);
+            return true;
+        }
+        return false;
+    },
             this.saveUsers(users);
             return true;
         }

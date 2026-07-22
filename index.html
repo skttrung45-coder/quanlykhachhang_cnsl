@@ -1716,7 +1716,7 @@
             }
         }
 
-        function handleRegisterSubmit(e) {
+        async function handleRegisterSubmit(e) {
             e.preventDefault();
             const fname = document.getElementById('reg-fullname').value;
             const u = document.getElementById('reg-username').value;
@@ -1731,7 +1731,7 @@
                 return;
             }
 
-            const res = authEngine.register(fname, u, p);
+            const res = await authEngine.register(fname, u, p);
             if (res.success) {
                 msgEl.className = 'p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg font-medium';
                 msgEl.innerText = res.message;
@@ -1858,16 +1858,16 @@
             });
         }
 
-        function approveUserAction(username) {
-            if (authEngine.approveUser(username)) {
+        async function approveUserAction(username) {
+            if (await authEngine.approveUser(username)) {
                 renderAdminUserTables();
                 alert(`Đã phê duyệt tài khoản "${username}" thành công!`);
             }
         }
 
-        function rejectUserAction(username) {
+        async function rejectUserAction(username) {
             if (confirm(`Bạn có chắc muốn từ chối tài khoản "${username}"?`)) {
-                if (authEngine.rejectUser(username)) {
+                if (await authEngine.rejectUser(username)) {
                     renderAdminUserTables();
                 }
             }
