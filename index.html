@@ -325,13 +325,19 @@
                         <span id="record-count" class="text-slate-500 font-medium">Hiển thị 0 bản ghi</span>
                         
                         <!-- Controls phân trang -->
-                        <div id="pagination-controls" class="flex items-center gap-2">
-                            <button onclick="changePage(-1)" class="px-2 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700 disabled:opacity-50 transition">
+                        <div id="pagination-controls" class="flex items-center gap-1 sm:gap-1.5">
+                            <button onclick="goToPage(1)" class="px-2 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700 disabled:opacity-40 transition text-xs" title="Trang đầu">
+                                ⏮
+                            </button>
+                            <button onclick="changePage(-1)" class="px-2.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700 disabled:opacity-40 transition text-xs">
                                 ◀ Trước
                             </button>
-                            <span id="page-info" class="text-slate-600 font-semibold px-1">Trang 1 / 1</span>
-                            <button onclick="changePage(1)" class="px-2 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700 disabled:opacity-50 transition">
+                            <span id="page-info" class="text-slate-700 font-semibold px-2 text-xs">Trang 1 / 1</span>
+                            <button onclick="changePage(1)" class="px-2.5 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700 disabled:opacity-40 transition text-xs">
                                 Tiếp ▶
+                            </button>
+                            <button onclick="goToPage(window.lastTotalPages || 1)" class="px-2 py-1 bg-white border border-slate-300 rounded hover:bg-slate-100 text-slate-700 disabled:opacity-40 transition text-xs" title="Trang cuối">
+                                ⏭
                             </button>
                         </div>
                     </div>
@@ -1019,11 +1025,14 @@
                 const paginationControls = document.getElementById('pagination-controls');
                 
                 if (currentTab === 'detail') {
+                    window.lastTotalPages = data.totalPages || 1;
                     if (data.totalPages > 1) {
                         paginationControls.classList.remove('hidden');
                         pageInfo.innerText = `Trang ${data.currentPage} / ${data.totalPages}`;
                         paginationControls.children[0].disabled = (data.currentPage <= 1);
-                        paginationControls.children[2].disabled = (data.currentPage >= data.totalPages);
+                        paginationControls.children[1].disabled = (data.currentPage <= 1);
+                        paginationControls.children[3].disabled = (data.currentPage >= data.totalPages);
+                        paginationControls.children[4].disabled = (data.currentPage >= data.totalPages);
                     } else {
                         paginationControls.classList.add('hidden');
                     }
@@ -1048,7 +1057,9 @@
                     `;
                     
                     const records = data.detail_records;
-                    document.getElementById('record-count').innerText = `Hiển thị ${records.length}/${summary.tongHóaĐơn} hóa đơn (${summary.tongKháchHàng} khách hàng)`;
+                    const startIdx = records.length > 0 ? (data.currentPage - 1) * PAGE_SIZE + 1 : 0;
+                    const endIdx = records.length > 0 ? Math.min(data.currentPage * PAGE_SIZE, summary.tongHóaĐơn) : 0;
+                    document.getElementById('record-count').innerText = `Hiển thị ${new Intl.NumberFormat('vi-VN').format(startIdx)} - ${new Intl.NumberFormat('vi-VN').format(endIdx)} / ${new Intl.NumberFormat('vi-VN').format(summary.tongHóaĐơn)} hóa đơn (${new Intl.NumberFormat('vi-VN').format(summary.tongKháchHàng)} khách hàng - 100 dòng/trang)`;
                     
                     if (records.length === 0) {
                         dataRows.innerHTML = `
@@ -1380,12 +1391,22 @@
         function changePage(offset) {
             currentDetailPage += offset;
             if (currentDetailPage < 1) currentDetailPage = 1;
+            if (window.lastTotalPages && currentDetailPage > window.lastTotalPages) currentDetailPage = window.lastTotalPages;
+            applyFilters();
+        }
+
+        function goToPage(targetPage) {
+            let p = parseInt(targetPage);
+            if (isNaN(p)) return;
+            if (p < 1) p = 1;
+            if (window.lastTotalPages && p > window.lastTotalPages) p = window.lastTotalPages;
+            currentDetailPage = p;
             applyFilters();
         }
 
         let currentDetailSearchTerm = "";
         let currentDetailPage = 1;
-        const PAGE_SIZE = 1000;
+        const PAGE_SIZE = 100;
 
         // Initialization and Loading Polling
         window.addEventListener('DOMContentLoaded', () => {
