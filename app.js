@@ -87,6 +87,32 @@ function parseIntNum(val) {
     return Math.round(n);
 }
 
+function extractYearAndMonthFromPath(pathOrName) {
+    let year = 0;
+    let month = 0;
+
+    const normalized = pathOrName.replace(/\\/g, '/');
+
+    // Extract 4-digit year from directory path or filename (e.g. 2025/01.xlsb -> 2025)
+    const yearMatch = normalized.match(/(?:^|\/)(20\d\d)(?:\/|_|-|\b)/);
+    if (yearMatch) {
+        year = parseInt(yearMatch[1]);
+    } else {
+        const anyYear = normalized.match(/\b(20\d\d)\b/);
+        if (anyYear) year = parseInt(anyYear[1]);
+    }
+
+    // Extract month from filename (e.g. 01.xlsb, 1.xlsx)
+    const filename = normalized.split('/').pop();
+    const monthMatch = filename.match(/(?:^|[^\d])(\d{1,2})\.(?:xls|xlsx|xlsb)$/i);
+    if (monthMatch) {
+        let m = parseInt(monthMatch[1]);
+        if (m >= 1 && m <= 12) month = m;
+    }
+
+    return { year, month };
+}
+
 function mapExcelRow(r, defaultNam = 0, defaultThang = 0) {
     let donViRaw = getRowVal(r, ['donVi', 'Đơn vị', 'donvi', 'ĐƠN VỊ', 'ĐV']) || "";
     let maKH = getRowVal(r, ['maKhachHang', 'Mã khách hàng', 'Mã KH', 'MA_KH', 'makhachhang']) || "";
@@ -469,9 +495,8 @@ window.handleFileUpload = async function() {
             
             const workbook = XLSX.read(dataBuffer, {type: 'array'});
             
-            let defaultNam = 0;
-            const yearMatch = file.name.match(/\b(20\d\d)\b/);
-            if (yearMatch) defaultNam = parseInt(yearMatch[1]);
+            const filePath = file.webkitRelativePath || file.name;
+            const { year: forcedNam, month: forcedThang } = extractYearAndMonthFromPath(filePath);
 
             for (const sheetName of workbook.SheetNames) {
                 const worksheet = workbook.Sheets[sheetName];
@@ -479,14 +504,16 @@ window.handleFileUpload = async function() {
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
                 if (!jsonData || !jsonData.length) continue;
 
-                let defaultThang = 0;
-                const monthMatch = sheetName.match(/(?:Tháng|T|Month|\b)(\d{1,2})\b/i);
-                if (monthMatch) {
-                    let m = parseInt(monthMatch[1]);
-                    if (m >= 1 && m <= 12) defaultThang = m;
+                let defaultThang = forcedThang;
+                if (defaultThang === 0) {
+                    const monthMatch = sheetName.match(/(?:Tháng|T|Month|\b)(\d{1,2})\b/i);
+                    if (monthMatch) {
+                        let m = parseInt(monthMatch[1]);
+                        if (m >= 1 && m <= 12) defaultThang = m;
+                    }
                 }
 
-                const mappedData = jsonData.map(r => mapExcelRow(r, defaultNam, defaultThang));
+                const mappedData = jsonData.map(r => mapExcelRow(r, forcedNam, defaultThang));
                 const validRows = mappedData.filter(r => r.donVi || r.maKhachHang || r.tenKhachHang || r.tieuThu || r.tongTien);
                 combinedData = combinedData.concat(validRows);
             }
@@ -544,23 +571,21 @@ window.fetchFromInputFolder = async function(silentError = false) {
         let combinedData = [];
         
         for (let i = 0; i < fileList.length; i++) {
-            const fileName = fileList[i];
-            if (loadingStatusText) loadingStatusText.innerText = `Đang tải file ${i + 1}/${fileList.length}: ${fileName}`;
+            const relPath = fileList[i];
+            const { year: forcedNam, month: forcedThang } = extractYearAndMonthFromPath(relPath);
+
+            if (loadingStatusText) loadingStatusText.innerText = `Đang tải file ${i + 1}/${fileList.length}: ${relPath}`;
             if (loadingProgressBar) loadingProgressBar.style.width = `${10 + Math.round(((i + 1) / fileList.length) * 80)}%`;
             
-            // Use encodeURIComponent to support filenames with spaces and accents
-            const fileResponse = await fetch(`input/${encodeURIComponent(fileName)}`);
+            const fetchUrl = `input/${relPath.split('/').map(encodeURIComponent).join('/')}`;
+            const fileResponse = await fetch(fetchUrl);
             if (!fileResponse.ok) {
-                console.error(`Không thể tải file: input/${fileName}`);
+                console.error(`Không thể tải file: ${fetchUrl}`);
                 continue;
             }
             const dataBuffer = await fileResponse.arrayBuffer();
             
             const workbook = XLSX.read(dataBuffer, {type: 'array'});
-            
-            let defaultNam = 0;
-            const yearMatch = fileName.match(/\b(20\d\d)\b/);
-            if (yearMatch) defaultNam = parseInt(yearMatch[1]);
 
             for (const sheetName of workbook.SheetNames) {
                 const worksheet = workbook.Sheets[sheetName];
@@ -568,14 +593,16 @@ window.fetchFromInputFolder = async function(silentError = false) {
                 const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
                 if (!jsonData || !jsonData.length) continue;
 
-                let defaultThang = 0;
-                const monthMatch = sheetName.match(/(?:Tháng|T|Month|\b)(\d{1,2})\b/i);
-                if (monthMatch) {
-                    let m = parseInt(monthMatch[1]);
-                    if (m >= 1 && m <= 12) defaultThang = m;
+                let defaultThang = forcedThang;
+                if (defaultThang === 0) {
+                    const monthMatch = sheetName.match(/(?:Tháng|T|Month|\b)(\d{1,2})\b/i);
+                    if (monthMatch) {
+                        let m = parseInt(monthMatch[1]);
+                        if (m >= 1 && m <= 12) defaultThang = m;
+                    }
                 }
 
-                const mappedData = jsonData.map(r => mapExcelRow(r, defaultNam, defaultThang));
+                const mappedData = jsonData.map(r => mapExcelRow(r, forcedNam, defaultThang));
                 const validRows = mappedData.filter(r => r.donVi || r.maKhachHang || r.tenKhachHang || r.tieuThu || r.tongTien);
                 combinedData = combinedData.concat(validRows);
             }
