@@ -87,12 +87,17 @@ function parseIntNum(val) {
     return Math.round(n);
 }
 
-function mapExcelRow(r) {
+function mapExcelRow(r, defaultNam = 0, defaultThang = 0) {
     let donViRaw = getRowVal(r, ['donVi', 'Đơn vị', 'donvi', 'ĐƠN VỊ', 'ĐV']) || "";
     let maKH = getRowVal(r, ['maKhachHang', 'Mã khách hàng', 'Mã KH', 'MA_KH', 'makhachhang']) || "";
     let tenKH = getRowVal(r, ['tenKhachHang', 'Tên khách hàng', 'Tên KH', 'TEN_KH', 'tenkhachhang']) || "";
+    
     let nam = parseIntNum(getRowVal(r, ['nam', 'Năm', 'NAM']));
+    if (!nam || nam === 0) nam = defaultNam;
+
     let thang = parseIntNum(getRowVal(r, ['thang', 'Tháng', 'THANG']));
+    if (!thang || thang === 0) thang = defaultThang;
+
     let maTuyen = getRowVal(r, ['maTuyenDoc', 'Mã tuyến đọc', 'Mã tuyến', 'Tuyến đọc', 'matuyendoc']) || "";
     let maPhamVi = getRowVal(r, ['maPhamVi', 'Mã phạm vi', 'Phạm vi', 'maphamvi']) || "";
     let mucDich = getRowVal(r, ['mucDich', 'Mục đích SD', 'Mục đích sử dụng', 'Mục đích', 'mucdich']) || "";
@@ -463,13 +468,28 @@ window.handleFileUpload = async function() {
             });
             
             const workbook = XLSX.read(dataBuffer, {type: 'array'});
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
             
-            const mappedData = jsonData.map(mapExcelRow);
-            
-            combinedData = combinedData.concat(mappedData);
+            let defaultNam = 0;
+            const yearMatch = file.name.match(/\b(20\d\d)\b/);
+            if (yearMatch) defaultNam = parseInt(yearMatch[1]);
+
+            for (const sheetName of workbook.SheetNames) {
+                const worksheet = workbook.Sheets[sheetName];
+                if (!worksheet) continue;
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
+                if (!jsonData || !jsonData.length) continue;
+
+                let defaultThang = 0;
+                const monthMatch = sheetName.match(/(?:Tháng|T|Month|\b)(\d{1,2})\b/i);
+                if (monthMatch) {
+                    let m = parseInt(monthMatch[1]);
+                    if (m >= 1 && m <= 12) defaultThang = m;
+                }
+
+                const mappedData = jsonData.map(r => mapExcelRow(r, defaultNam, defaultThang));
+                const validRows = mappedData.filter(r => r.donVi || r.maKhachHang || r.tenKhachHang || r.tieuThu || r.tongTien);
+                combinedData = combinedData.concat(validRows);
+            }
         }
         
         window.allData = combinedData;
@@ -537,13 +557,28 @@ window.fetchFromInputFolder = async function(silentError = false) {
             const dataBuffer = await fileResponse.arrayBuffer();
             
             const workbook = XLSX.read(dataBuffer, {type: 'array'});
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
             
-            const mappedData = jsonData.map(mapExcelRow);
-            
-            combinedData = combinedData.concat(mappedData);
+            let defaultNam = 0;
+            const yearMatch = fileName.match(/\b(20\d\d)\b/);
+            if (yearMatch) defaultNam = parseInt(yearMatch[1]);
+
+            for (const sheetName of workbook.SheetNames) {
+                const worksheet = workbook.Sheets[sheetName];
+                if (!worksheet) continue;
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
+                if (!jsonData || !jsonData.length) continue;
+
+                let defaultThang = 0;
+                const monthMatch = sheetName.match(/(?:Tháng|T|Month|\b)(\d{1,2})\b/i);
+                if (monthMatch) {
+                    let m = parseInt(monthMatch[1]);
+                    if (m >= 1 && m <= 12) defaultThang = m;
+                }
+
+                const mappedData = jsonData.map(r => mapExcelRow(r, defaultNam, defaultThang));
+                const validRows = mappedData.filter(r => r.donVi || r.maKhachHang || r.tenKhachHang || r.tieuThu || r.tongTien);
+                combinedData = combinedData.concat(validRows);
+            }
         }
 
         if (combinedData.length === 0) {
