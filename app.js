@@ -4,7 +4,7 @@
 // ========================
 const DB_NAME = 'WaterDataDB';
 const STORE_NAME = 'WaterDataStore';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 window.dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -14,6 +14,9 @@ window.dbPromise = new Promise((resolve, reject) => {
         const db = event.target.result;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
             db.createObjectStore(STORE_NAME);
+        }
+        if (!db.objectStoreNames.contains('UserStore')) {
+            db.createObjectStore('UserStore');
         }
     };
 });
@@ -841,5 +844,241 @@ window.fetchFromInputFolder = async function(silentError = false) {
         return false;
     } finally {
         window.hideLoading();
+    }
+};
+
+// ==========================================
+// USER AUTHENTICATION & MANAGEMENT ENGINE
+// ==========================================
+const USER_STORAGE_KEY = 'water_app_users_v1';
+const SESSION_STORAGE_KEY = 'water_app_current_user_v1';
+
+// Default Admin Account as per requirement (Password: "170101")
+const DEFAULT_ADMIN = {
+    username: 'admin',
+    fullName: 'Quản trị viên Hệ thống',
+    password: '170101',
+    role: 'admin',
+    status: 'approved',
+    createdAt: '2026-01-01T00:00:00.000Z'
+};
+
+window.authEngine = {
+    getUsers: function() {
+        try {
+            const raw = localStorage.getItem(USER_STORAGE_KEY);
+            let users = raw ? JSON.parse(raw) : [];
+            // Ensure default admin exists
+            const adminIdx = users.findIndex(u => u.username.toLowerCase() === 'admin');
+            if (adminIdx === -1) {
+                users.unshift({ ...DEFAULT_ADMIN });
+                this.saveUsers(users);
+            } else {
+                // Ensure default admin password is 170101 if unset
+                if (!users[adminIdx].password) {
+                    users[adminIdx].password = '170101';
+                    this.saveUsers(users);
+                }
+            }
+            return users;
+        } catch (e) {
+            console.error("Lỗi đọc danh sách người dùng:", e);
+            return [{ ...DEFAULT_ADMIN }];
+        }
+    },
+
+    saveUsers: function(users) {
+        try {
+            localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(users));
+            window.saveUsersToIDB(users).catch(() => {});
+        } catch (e) {
+            console.error("Lỗi lưu người dùng vào localStorage:", e);
+        }
+    },
+
+    getCurrentUser: function() {
+        try {
+            const raw = sessionStorage.getItem(SESSION_STORAGE_KEY) || localStorage.getItem(SESSION_STORAGE_KEY);
+            return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+            return null;
+        }
+    },
+
+    setCurrentUser: function(user, remember = false) {
+        if (!user) {
+            sessionStorage.removeItem(SESSION_STORAGE_KEY);
+            localStorage.removeItem(SESSION_STORAGE_KEY);
+        } else {
+            const data = JSON.stringify({
+                username: user.username,
+                fullName: user.fullName,
+                role: user.role,
+                status: user.status
+            });
+            sessionStorage.setItem(SESSION_STORAGE_KEY, data);
+            if (remember) localStorage.setItem(SESSION_STORAGE_KEY, data);
+        }
+    },
+
+    login: function(username, password) {
+        const users = this.getUsers();
+        const uname = (username || '').trim().toLowerCase();
+        const pwd = (password || '').trim();
+
+        const user = users.find(u => u.username.toLowerCase() === uname);
+
+        if (!user) {
+            return { success: false, message: 'Tên đăng nhập không tồn tại!' };
+        }
+
+        if (user.password !== pwd) {
+            return { success: false, message: 'Mật khẩu không chính xác!' };
+        }
+
+        if (user.status === 'pending') {
+            return { success: false, message: 'Tài khoản của bạn đang chờ Admin phê duyệt trước khi có thể đăng nhập!' };
+        }
+
+        if (user.status === 'rejected') {
+            return { success: false, message: 'Tài khoản của bạn đã bị từ chối phê duyệt. Vui lòng liên hệ Admin!' };
+        }
+
+        this.setCurrentUser(user);
+        return { success: true, user: user };
+    },
+
+    register: function(fullName, username, password) {
+        const users = this.getUsers();
+        const uname = (username || '').trim().toLowerCase();
+        const fname = (fullName || '').trim();
+        const pwd = (password || '').trim();
+
+        if (!uname || !pwd || !fname) {
+            return { success: false, message: 'Vui lòng điền đầy đủ các thông tin đăng ký!' };
+        }
+
+        if (users.some(u => u.username.toLowerCase() === uname)) {
+            return { success: false, message: 'Tên đăng nhập này đã tồn tại trong hệ thống!' };
+        }
+
+        const newUser = {
+            username: (username || '').trim(),
+            fullName: fname,
+            password: pwd,
+            role: 'user',
+            status: 'pending',
+            createdAt: new Date().toISOString()
+        };
+
+        users.push(newUser);
+        this.saveUsers(users);
+
+        return { success: true, message: 'Đăng ký thành công! Tài khoản của bạn đang chờ Admin phê duyệt.' };
+    },
+
+    approveUser: function(username) {
+        const users = this.getUsers();
+        const idx = users.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
+        if (idx >= 0) {
+            users[idx].status = 'approved';
+            this.saveUsers(users);
+            return true;
+        }
+        return false;
+    },
+
+    rejectUser: function(username) {
+        const users = this.getUsers();
+        const idx = users.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
+        if (idx >= 0) {
+            users[idx].status = 'rejected';
+            this.saveUsers(users);
+            return true;
+        }
+        return false;
+    },
+
+    deleteUser: function(username) {
+        let users = this.getUsers();
+        if (username.toLowerCase() === 'admin') {
+            alert('Không thể xóa tài khoản Admin mặc định!');
+            return false;
+        }
+        users = users.filter(u => u.username.toLowerCase() !== username.toLowerCase());
+        this.saveUsers(users);
+        return true;
+    },
+
+    resetPassword: function(username, newPassword) {
+        const users = this.getUsers();
+        const idx = users.findIndex(u => u.username.toLowerCase() === username.toLowerCase());
+        if (idx >= 0) {
+            users[idx].password = newPassword;
+            this.saveUsers(users);
+            return true;
+        }
+        return false;
+    },
+
+    getPendingCount: function() {
+        const users = this.getUsers();
+        return users.filter(u => u.status === 'pending').length;
+    },
+
+    exportUserData: function() {
+        const users = this.getUsers();
+        const exportObj = {
+            system: "WaterDataManagement",
+            exportedAt: new Date().toISOString(),
+            totalUsers: users.length,
+            users: users
+        };
+        const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `user_data_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    },
+
+    importUserData: function(jsonString) {
+        try {
+            const data = JSON.parse(jsonString);
+            const importedUsers = Array.isArray(data) ? data : (data.users || []);
+            if (!Array.isArray(importedUsers) || importedUsers.length === 0) {
+                throw new Error("File user data không đúng định dạng!");
+            }
+            let currentUsers = this.getUsers();
+            let added = 0, updated = 0;
+            importedUsers.forEach(u => {
+                if (!u.username) return;
+                const idx = currentUsers.findIndex(c => c.username.toLowerCase() === u.username.toLowerCase());
+                if (idx >= 0) {
+                    currentUsers[idx] = { ...currentUsers[idx], ...u };
+                    updated++;
+                } else {
+                    currentUsers.push(u);
+                    added++;
+                }
+            });
+            this.saveUsers(currentUsers);
+            return { success: true, message: `Đã nạp file thành công! Thêm mới: ${added}, Cập nhật: ${updated} tài khoản.` };
+        } catch (err) {
+            return { success: false, message: "Lỗi nạp file user data: " + err.message };
+        }
+    }
+};
+
+window.saveUsersToIDB = async function(users) {
+    try {
+        const db = await window.dbPromise;
+        if (!db.objectStoreNames.contains('UserStore')) return;
+        const transaction = db.transaction(['UserStore'], 'readwrite');
+        const store = transaction.objectStore('UserStore');
+        store.put(users, 'allUsers');
+    } catch (e) {
+        // Fallback silently if UserStore isn't available
     }
 };

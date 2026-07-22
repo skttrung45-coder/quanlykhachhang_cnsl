@@ -120,6 +120,173 @@
             <div id="loading-progress-bar" class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
         </div>
         <p id="loading-time-text" class="text-xs text-slate-400 font-mono">Thời gian: 0s</p>
+    <!-- Auth Overlay Modal (Login / Register) -->
+    <div id="auth-overlay" class="fixed inset-0 z-[100] bg-slate-900/90 backdrop-blur-md flex items-center justify-center p-4 transition-all duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden relative transition-all transform scale-100">
+            <!-- Header Banner -->
+            <div class="bg-gradient-to-r from-blue-800 to-indigo-900 p-6 text-white text-center relative">
+                <div class="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center mx-auto mb-3 backdrop-blur-sm border border-white/20">
+                    <img src="icon.ico" alt="Logo" class="w-10 h-10 object-contain">
+                </div>
+                <h2 class="text-xl font-bold">HỆ THỐNG QUẢN LÝ THỐNG KÊ NƯỚC</h2>
+                <p class="text-xs text-blue-200 mt-1">Đăng nhập để sử dụng và bảo mật thông tin dữ liệu</p>
+            </div>
+
+            <!-- Tab Switchers -->
+            <div class="flex border-b bg-slate-50 text-sm font-semibold">
+                <button id="auth-tab-login" onclick="switchAuthTab('login')" class="flex-1 py-3 border-b-2 border-blue-700 text-blue-700 transition font-bold">
+                    🔑 Đăng Nhập
+                </button>
+                <button id="auth-tab-register" onclick="switchAuthTab('register')" class="flex-1 py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition">
+                    📝 Đăng Ký Tài Khoản
+                </button>
+            </div>
+
+            <div class="p-6">
+                <!-- Form Đăng Nhập -->
+                <form id="form-auth-login" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">TÊN ĐĂNG NHẬP</label>
+                        <input type="text" id="login-username" required placeholder="Nhập tên đăng nhập" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">MẬT KHẨU</label>
+                        <input type="password" id="login-password" required placeholder="Nhập mật khẩu" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50">
+                    </div>
+                    
+                    <div id="login-error-msg" class="hidden p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium"></div>
+
+                    <button type="submit" class="w-full bg-blue-700 hover:bg-blue-800 text-white font-semibold py-2.5 rounded-lg text-sm shadow transition-all duration-200 flex items-center justify-center gap-2">
+                        ⚡ Đăng Nhập Hệ Thống
+                    </button>
+
+                    <div class="bg-amber-50 border border-amber-200 p-3 rounded-lg text-[11px] text-amber-800 space-y-1">
+                        <p class="font-bold flex items-center gap-1">🔑 Tài khoản Admin mặc định:</p>
+                        <p class="font-mono">Tên đăng nhập: <strong>admin</strong> | Mật khẩu: <strong>170101</strong></p>
+                    </div>
+                </form>
+
+                <!-- Form Đăng Ký -->
+                <form id="form-auth-register" onsubmit="handleRegisterSubmit(event)" class="space-y-3 hidden">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">HỌ VÀ TÊN</label>
+                        <input type="text" id="reg-fullname" required placeholder="Ví dụ: Nguyễn Văn A" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">TÊN ĐĂNG NHẬP MONG MUỐN</label>
+                        <input type="text" id="reg-username" required placeholder="Ví dụ: nguyenvana" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">MẬT KHẨU</label>
+                        <input type="password" id="reg-password" required placeholder="Nhập mật khẩu" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">NHẬP LẠI MẬT KHẨU</label>
+                        <input type="password" id="reg-confirm" required placeholder="Xác nhận mật khẩu" class="w-full p-2.5 border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-slate-50">
+                    </div>
+
+                    <div id="reg-status-msg" class="hidden p-3 text-xs rounded-lg font-medium"></div>
+
+                    <div class="bg-blue-50 border border-blue-200 p-2.5 rounded-lg text-[11px] text-blue-800">
+                        ℹ️ <strong>Lưu ý:</strong> Tài khoản đăng ký mới sẽ gửi yêu cầu phê duyệt tới Admin trước khi được phép đăng nhập.
+                    </div>
+
+                    <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm shadow transition-all duration-200 flex items-center justify-center gap-2">
+                        📝 Đăng Ký Tài Khoản
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin User Management & Approval Modal -->
+    <div id="admin-user-modal" class="fixed inset-0 z-[90] bg-slate-900/60 backdrop-blur-sm hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden">
+            <!-- Modal Header -->
+            <div class="bg-slate-800 text-white px-6 py-4 flex justify-between items-center border-b border-slate-700">
+                <div class="flex items-center gap-2.5">
+                    <span class="text-xl">⚙️</span>
+                    <div>
+                        <h3 class="text-base font-bold">QUẢN LÝ TÀI KHOẢN & PHÊ DUYỆT NGƯỜI DÙNG</h3>
+                        <p class="text-xs text-slate-300">Phê duyệt yêu cầu tài khoản mới và lưu trữ dữ liệu người dùng</p>
+                    </div>
+                </div>
+                <button onclick="closeAdminUserModal()" class="w-8 h-8 rounded-full bg-slate-700 hover:bg-slate-600 flex items-center justify-center text-white transition text-sm">✕</button>
+            </div>
+
+            <!-- Top Action Toolbar -->
+            <div class="bg-slate-50 p-4 border-b flex flex-wrap justify-between items-center gap-3 text-xs">
+                <div class="flex items-center gap-3">
+                    <span class="font-bold text-slate-700">Tệp dữ liệu người dùng (User Data):</span>
+                    <button onclick="authEngine.exportUserData()" class="bg-blue-700 hover:bg-blue-800 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 shadow-sm">
+                        📥 Xuất user_data.json
+                    </button>
+                    <label class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-3 py-1.5 rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-sm">
+                        📤 Nạp user_data.json
+                        <input type="file" accept=".json" onchange="handleImportUserDataFile(event)" class="hidden">
+                    </label>
+                </div>
+                <div class="flex gap-2">
+                    <span class="bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full font-bold border border-amber-200">
+                        Chờ duyệt: <strong id="modal-pending-count">0</strong>
+                    </span>
+                    <span class="bg-blue-100 text-blue-800 px-2.5 py-1 rounded-full font-bold border border-blue-200">
+                        Tổng tài khoản: <strong id="modal-total-count">0</strong>
+                    </span>
+                </div>
+            </div>
+
+            <!-- Tabs Selection -->
+            <div class="flex border-b bg-white px-6">
+                <button id="admin-tab-btn-pending" onclick="switchAdminUserTab('pending')" class="py-3 px-4 text-xs font-bold border-b-2 border-blue-700 text-blue-700 transition flex items-center gap-2">
+                    🔔 Yêu cầu chờ phê duyệt <span id="admin-tab-pending-badge" class="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">0</span>
+                </button>
+                <button id="admin-tab-btn-all" onclick="switchAdminUserTab('all')" class="py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2">
+                    👥 Tất cả tài khoản người dùng
+                </button>
+            </div>
+
+            <!-- Content Area -->
+            <div class="p-6 overflow-y-auto flex-1 bg-slate-50/50">
+                <!-- Tab: Pending Approvals -->
+                <div id="admin-tab-pending-content">
+                    <div class="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead class="bg-slate-100 text-slate-700 font-bold border-b">
+                                <tr>
+                                    <th class="p-3">STT</th>
+                                    <th class="p-3">Họ và tên</th>
+                                    <th class="p-3">Tên đăng nhập</th>
+                                    <th class="p-3">Ngày đăng ký</th>
+                                    <th class="p-3 text-center">Hành động phê duyệt</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-pending-rows" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Tab: All Users -->
+                <div id="admin-tab-all-content" class="hidden">
+                    <div class="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-sm">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead class="bg-slate-100 text-slate-700 font-bold border-b">
+                                <tr>
+                                    <th class="p-3">STT</th>
+                                    <th class="p-3">Họ và tên</th>
+                                    <th class="p-3">Tên đăng nhập</th>
+                                    <th class="p-3">Mật khẩu</th>
+                                    <th class="p-3">Vai trò</th>
+                                    <th class="p-3">Trạng thái</th>
+                                    <th class="p-3 text-center">Thao tác</th>
+                                </tr>
+                            </thead>
+                            <tbody id="admin-allusers-rows" class="divide-y"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Thanh Header chính -->
@@ -130,6 +297,27 @@
             <h1 class="text-sm sm:text-xl font-bold tracking-tight">HỆ THỐNG THỐNG KÊ DỮ LIỆU NƯỚC SẠCH</h1>
         </div>
 
+        <!-- User Controls / Auth Badge -->
+        <div id="header-user-section" class="flex items-center gap-2 sm:gap-3">
+            <!-- Nút Thông Báo Admin Phê Duyệt -->
+            <button id="btn-admin-notif" onclick="openAdminUserModal()" class="relative bg-blue-700 hover:bg-blue-600 px-3 py-1.5 rounded-lg text-white transition flex items-center gap-1.5 border border-blue-600 shadow-sm hidden" title="Thông báo yêu cầu phê duyệt tài khoản">
+                <span class="text-base">🔔</span>
+                <span class="text-xs font-semibold hidden md:inline">Phê duyệt</span>
+                <span id="notif-badge" class="bg-red-500 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full animate-pulse hidden">0</span>
+            </button>
+
+            <!-- Thẻ Người dùng Đăng nhập -->
+            <div id="user-info-tag" class="hidden sm:flex items-center gap-2 bg-blue-900/60 px-3 py-1.5 rounded-lg border border-blue-600 text-xs">
+                <span class="text-slate-300">👤</span>
+                <span id="user-display-name" class="font-semibold">Guest</span>
+                <span id="user-display-role" class="bg-emerald-500 text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase">User</span>
+            </div>
+
+            <!-- Nút Đăng xuất -->
+            <button id="btn-logout-header" onclick="handleLogout()" class="bg-red-600 hover:bg-red-700 text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition shadow flex items-center gap-1">
+                🚪 <span class="hidden sm:inline">Đăng xuất</span>
+            </button>
+        </div>
     </header>
     <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleMobileSidebar()"></div>
 
@@ -1431,7 +1619,297 @@
             }
         }
 
+        // ======= AUTHENTICATION & USER MANAGEMENT UI LOGIC =======
+        function checkAuthStatus() {
+            if (!window.authEngine) return true;
+            const user = authEngine.getCurrentUser();
+            const authOverlay = document.getElementById('auth-overlay');
+            const notifBtn = document.getElementById('btn-admin-notif');
+            const userInfoTag = document.getElementById('user-info-tag');
+            const userNameEl = document.getElementById('user-display-name');
+            const userRoleEl = document.getElementById('user-display-role');
+
+            if (!user) {
+                if (authOverlay) {
+                    authOverlay.classList.remove('hidden', 'opacity-0');
+                    authOverlay.classList.add('flex');
+                }
+                return false;
+            } else {
+                if (authOverlay) {
+                    authOverlay.classList.add('opacity-0');
+                    setTimeout(() => {
+                        authOverlay.classList.remove('flex');
+                        authOverlay.classList.add('hidden');
+                    }, 300);
+                }
+
+                if (userNameEl) userNameEl.innerText = user.fullName || user.username;
+                if (userRoleEl) {
+                    if (user.role === 'admin') {
+                        userRoleEl.innerText = 'ADMIN';
+                        userRoleEl.className = 'bg-red-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase';
+                    } else {
+                        userRoleEl.innerText = 'USER';
+                        userRoleEl.className = 'bg-emerald-600 text-white text-[10px] px-1.5 py-0.5 rounded font-bold uppercase';
+                    }
+                }
+                if (userInfoTag) userInfoTag.classList.remove('hidden');
+
+                if (user.role === 'admin') {
+                    if (notifBtn) notifBtn.classList.remove('hidden');
+                    updateAdminPendingBadge();
+                } else {
+                    if (notifBtn) notifBtn.classList.add('hidden');
+                }
+                return true;
+            }
+        }
+
+        function updateAdminPendingBadge() {
+            if (!window.authEngine) return;
+            const pendingCount = authEngine.getPendingCount();
+            const badge = document.getElementById('notif-badge');
+            if (badge) {
+                badge.innerText = pendingCount;
+                if (pendingCount > 0) {
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            }
+        }
+
+        function switchAuthTab(tab) {
+            const formLogin = document.getElementById('form-auth-login');
+            const formRegister = document.getElementById('form-auth-register');
+            const tabLogin = document.getElementById('auth-tab-login');
+            const tabRegister = document.getElementById('auth-tab-register');
+
+            if (tab === 'login') {
+                formLogin.classList.remove('hidden');
+                formRegister.classList.add('hidden');
+                tabLogin.className = 'flex-1 py-3 border-b-2 border-blue-700 text-blue-700 transition font-bold';
+                tabRegister.className = 'flex-1 py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition';
+            } else {
+                formLogin.classList.add('hidden');
+                formRegister.classList.remove('hidden');
+                tabRegister.className = 'flex-1 py-3 border-b-2 border-blue-700 text-blue-700 transition font-bold';
+                tabLogin.className = 'flex-1 py-3 border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition';
+            }
+        }
+
+        function handleLoginSubmit(e) {
+            e.preventDefault();
+            const u = document.getElementById('login-username').value;
+            const p = document.getElementById('login-password').value;
+            const errorMsg = document.getElementById('login-error-msg');
+
+            const res = authEngine.login(u, p);
+            if (res.success) {
+                errorMsg.classList.add('hidden');
+                checkAuthStatus();
+                initializeMainApp();
+            } else {
+                errorMsg.innerText = res.message;
+                errorMsg.classList.remove('hidden');
+            }
+        }
+
+        function handleRegisterSubmit(e) {
+            e.preventDefault();
+            const fname = document.getElementById('reg-fullname').value;
+            const u = document.getElementById('reg-username').value;
+            const p = document.getElementById('reg-password').value;
+            const pConf = document.getElementById('reg-confirm').value;
+            const msgEl = document.getElementById('reg-status-msg');
+
+            if (p !== pConf) {
+                msgEl.className = 'p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium';
+                msgEl.innerText = 'Mật khẩu nhập lại không khớp!';
+                msgEl.classList.remove('hidden');
+                return;
+            }
+
+            const res = authEngine.register(fname, u, p);
+            if (res.success) {
+                msgEl.className = 'p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs rounded-lg font-medium';
+                msgEl.innerText = res.message;
+                msgEl.classList.remove('hidden');
+                document.getElementById('form-auth-register').reset();
+                updateAdminPendingBadge();
+            } else {
+                msgEl.className = 'p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium';
+                msgEl.innerText = res.message;
+                msgEl.classList.remove('hidden');
+            }
+        }
+
+        function handleLogout() {
+            if (confirm("Bạn có chắc chắn muốn đăng xuất khỏi hệ thống?")) {
+                authEngine.setCurrentUser(null);
+                location.reload();
+            }
+        }
+
+        // ======= ADMIN USER MODAL LOGIC =======
+        function openAdminUserModal() {
+            const current = authEngine.getCurrentUser();
+            if (!current || current.role !== 'admin') return;
+
+            renderAdminUserTables();
+            document.getElementById('admin-user-modal').classList.remove('hidden');
+        }
+
+        function closeAdminUserModal() {
+            document.getElementById('admin-user-modal').classList.add('hidden');
+        }
+
+        function switchAdminUserTab(tab) {
+            const pendingTab = document.getElementById('admin-tab-pending-content');
+            const allTab = document.getElementById('admin-tab-all-content');
+            const btnPending = document.getElementById('admin-tab-btn-pending');
+            const btnAll = document.getElementById('admin-tab-btn-all');
+
+            if (tab === 'pending') {
+                pendingTab.classList.remove('hidden');
+                allTab.classList.add('hidden');
+                btnPending.className = 'py-3 px-4 text-xs font-bold border-b-2 border-blue-700 text-blue-700 transition flex items-center gap-2';
+                btnAll.className = 'py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2';
+            } else {
+                pendingTab.classList.add('hidden');
+                allTab.classList.remove('hidden');
+                btnAll.className = 'py-3 px-4 text-xs font-bold border-b-2 border-blue-700 text-blue-700 transition flex items-center gap-2';
+                btnPending.className = 'py-3 px-4 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition flex items-center gap-2';
+            }
+        }
+
+        function renderAdminUserTables() {
+            const users = authEngine.getUsers();
+            const pendingUsers = users.filter(u => u.status === 'pending');
+            
+            document.getElementById('modal-pending-count').innerText = pendingUsers.length;
+            document.getElementById('modal-total-count').innerText = users.length;
+            document.getElementById('admin-tab-pending-badge').innerText = pendingUsers.length;
+            updateAdminPendingBadge();
+
+            // Render Pending Table
+            const tbodyPending = document.getElementById('admin-pending-rows');
+            if (pendingUsers.length === 0) {
+                tbodyPending.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400">Không có yêu cầu đăng ký nào đang chờ duyệt.</td></tr>`;
+            } else {
+                tbodyPending.innerHTML = '';
+                pendingUsers.forEach((u, i) => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50';
+                    const dateStr = u.createdAt ? new Date(u.createdAt).toLocaleString('vi-VN') : 'N/A';
+                    tr.innerHTML = `
+                        <td class="p-3 font-semibold text-slate-500">${i + 1}</td>
+                        <td class="p-3 font-bold text-slate-800">${u.fullName || ''}</td>
+                        <td class="p-3 font-mono font-medium text-blue-700">${u.username || ''}</td>
+                        <td class="p-3 text-slate-500 text-[11px]">${dateStr}</td>
+                        <td class="p-3 text-center space-x-2">
+                            <button onclick="approveUserAction('${u.username}')" class="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1 rounded text-xs font-bold transition shadow-sm">
+                                ✅ Phê duyệt
+                            </button>
+                            <button onclick="rejectUserAction('${u.username}')" class="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs font-bold transition shadow-sm">
+                                ❌ Từ chối
+                            </button>
+                        </td>
+                    `;
+                    tbodyPending.appendChild(tr);
+                });
+            }
+
+            // Render All Users Table
+            const tbodyAll = document.getElementById('admin-allusers-rows');
+            tbodyAll.innerHTML = '';
+            users.forEach((u, i) => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50';
+                
+                let statusBadge = '<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-bold">Đã duyệt</span>';
+                if (u.status === 'pending') statusBadge = '<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">Chờ duyệt</span>';
+                else if (u.status === 'rejected') statusBadge = '<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded font-bold">Đã từ chối</span>';
+
+                let roleBadge = u.role === 'admin' 
+                    ? '<span class="bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">ADMIN</span>' 
+                    : '<span class="bg-blue-600 text-white px-2 py-0.5 rounded text-[10px] font-bold">USER</span>';
+
+                tr.innerHTML = `
+                    <td class="p-3 font-semibold text-slate-500">${i + 1}</td>
+                    <td class="p-3 font-bold text-slate-800">${u.fullName || ''}</td>
+                    <td class="p-3 font-mono font-medium text-blue-700">${u.username || ''}</td>
+                    <td class="p-3 font-mono text-slate-500">••••••••</td>
+                    <td class="p-3">${roleBadge}</td>
+                    <td class="p-3">${statusBadge}</td>
+                    <td class="p-3 text-center space-x-1.5">
+                        <button onclick="resetUserPasswordPrompt('${u.username}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 px-2.5 py-1 rounded text-xs transition border border-slate-300" title="Đổi mật khẩu">
+                            🔑
+                        </button>
+                        ${u.username.toLowerCase() !== 'admin' ? `
+                            <button onclick="deleteUserAction('${u.username}')" class="bg-red-50 hover:bg-red-100 text-red-600 px-2.5 py-1 rounded text-xs transition border border-red-200" title="Xóa tài khoản">
+                                🗑️
+                            </button>
+                        ` : ''}
+                    </td>
+                `;
+                tbodyAll.appendChild(tr);
+            });
+        }
+
+        function approveUserAction(username) {
+            if (authEngine.approveUser(username)) {
+                renderAdminUserTables();
+                alert(`Đã phê duyệt tài khoản "${username}" thành công!`);
+            }
+        }
+
+        function rejectUserAction(username) {
+            if (confirm(`Bạn có chắc muốn từ chối tài khoản "${username}"?`)) {
+                if (authEngine.rejectUser(username)) {
+                    renderAdminUserTables();
+                }
+            }
+        }
+
+        function deleteUserAction(username) {
+            if (confirm(`Bạn có chắc muốn xóa vĩnh viễn tài khoản "${username}"?`)) {
+                if (authEngine.deleteUser(username)) {
+                    renderAdminUserTables();
+                }
+            }
+        }
+
+        function resetUserPasswordPrompt(username) {
+            const newPwd = prompt(`Nhập mật khẩu mới cho tài khoản "${username}":`);
+            if (newPwd && newPwd.trim()) {
+                authEngine.resetPassword(username, newPwd.trim());
+                alert(`Đã cập nhật mật khẩu mới cho tài khoản "${username}"!`);
+            }
+        }
+
+        function handleImportUserDataFile(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const res = authEngine.importUserData(evt.target.result);
+                alert(res.message);
+                if (res.success) {
+                    renderAdminUserTables();
+                }
+            };
+            reader.readAsText(file);
+        }
+
         async function initializeMainApp() {
+            // Check user authentication status first
+            if (!checkAuthStatus()) {
+                console.log("Chưa đăng nhập, hiển thị màn hình Auth.");
+                return;
+            }
+
             // Check IndexedDB first
             if (window.loadFromIDB) {
                 const cachedData = await window.loadFromIDB();
