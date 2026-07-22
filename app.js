@@ -1106,11 +1106,6 @@ window.authEngine = {
         }
         return false;
     },
-            this.saveUsers(users);
-            return true;
-        }
-        return false;
-    },
 
     deleteUser: function(username) {
         let users = this.getUsers();
