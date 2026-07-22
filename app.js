@@ -389,17 +389,29 @@ window.mockApiCustomerChanges = function(payload) {
     const dfA = df.filter(r => r.nam === payload.namA && payload.thangA.includes(r.thang));
     const dfB = df.filter(r => r.nam === payload.namB && payload.thangB === r.thang);
     
+    // Set of customer codes appearing in dataset strictly before Period B
+    const earlierCustomers = new Set();
+    df.forEach(r => {
+        if (r.maKhachHang && (r.nam < payload.namB || (r.nam === payload.namB && r.thang < payload.thangB))) {
+            earlierCustomers.add(r.maKhachHang);
+        }
+    });
+
     // For dfA, group by khachHang, taking max tieuThu (just a proxy for the customer)
     const khA = new Map();
     dfA.forEach(r => {
-        if (!khA.has(r.maKhachHang)) khA.set(r.maKhachHang, r);
-        else if (r.tieuThu > khA.get(r.maKhachHang).tieuThu) khA.set(r.maKhachHang, r);
+        if (r.maKhachHang) {
+            if (!khA.has(r.maKhachHang)) khA.set(r.maKhachHang, r);
+            else if (r.tieuThu > khA.get(r.maKhachHang).tieuThu) khA.set(r.maKhachHang, r);
+        }
     });
 
     const khB = new Map();
     dfB.forEach(r => {
-        if (!khB.has(r.maKhachHang)) khB.set(r.maKhachHang, r);
-        else if (r.tieuThu > khB.get(r.maKhachHang).tieuThu) khB.set(r.maKhachHang, r);
+        if (r.maKhachHang) {
+            if (!khB.has(r.maKhachHang)) khB.set(r.maKhachHang, r);
+            else if (r.tieuThu > khB.get(r.maKhachHang).tieuThu) khB.set(r.maKhachHang, r);
+        }
     });
 
     const totalA = khA.size;
@@ -411,7 +423,14 @@ window.mockApiCustomerChanges = function(payload) {
     
     khB.forEach((val, key) => {
         if (!khA.has(key)) {
-            newCustomers.push(val);
+            // Customer is in Period B but NOT in Period A
+            if (earlierCustomers.has(key)) {
+                // Appeared in earlier months -> KH lắp lại (Reinstated customer)
+                reinstatedCustomers.push(val);
+            } else {
+                // Never appeared in any earlier month -> KH mới hoàn toàn (Truly new customer)
+                newCustomers.push(val);
+            }
         }
     });
 
@@ -421,14 +440,15 @@ window.mockApiCustomerChanges = function(payload) {
         }
     });
     
+    const limit = payload.isExport ? undefined : 100;
     return {
         totalA, totalB,
         newCount: newCustomers.length,
         reinstatedCount: reinstatedCustomers.length,
         cancelledCount: cancelledCustomers.length,
-        newCustomers: newCustomers.slice(0, 100),
-        reinstatedCustomers: reinstatedCustomers.slice(0, 100),
-        cancelledCustomers: cancelledCustomers.slice(0, 100)
+        newCustomers: limit ? newCustomers.slice(0, limit) : newCustomers,
+        reinstatedCustomers: limit ? reinstatedCustomers.slice(0, limit) : reinstatedCustomers,
+        cancelledCustomers: limit ? cancelledCustomers.slice(0, limit) : cancelledCustomers
     };
 };
 
@@ -444,7 +464,8 @@ window.clientSideExport = async function(basePayload, currentTab) {
             thangA: activeFilters.cc_thangA,
             namB: parseInt(document.getElementById('cc-namB').value),
             thangB: parseInt(document.getElementById('cc-thangB').value),
-            donVi: activeFilters.donVi
+            donVi: activeFilters.donVi,
+            isExport: true
         };
         const changes = window.mockApiCustomerChanges(payload);
         const wb = XLSX.utils.book_new();
