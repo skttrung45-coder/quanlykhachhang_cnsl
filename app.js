@@ -452,6 +452,57 @@ window.mockApiCustomerChanges = function(payload) {
     };
 };
 
+function buildMonthlyMatrixSheet(df, valueKey) {
+    let years = Array.from(new Set(df.map(r => r.nam))).filter(y => y > 0).sort((a, b) => a - b);
+    if (years.length === 0) {
+        years = [new Date().getFullYear()];
+    }
+    
+    const headers = ['Tháng', ...years.map(y => `Năm ${y}`)];
+    const rows = [headers];
+    
+    const totalPerYear = {};
+    years.forEach(y => { totalPerYear[y] = 0; });
+
+    const aggMap = {};
+    for (let m = 1; m <= 12; m++) {
+        aggMap[m] = {};
+        years.forEach(y => { aggMap[m][y] = 0; });
+    }
+
+    df.forEach(r => {
+        if (r.nam > 0 && r.thang >= 1 && r.thang <= 12) {
+            if (aggMap[r.thang] && aggMap[r.thang][r.nam] !== undefined) {
+                aggMap[r.thang][r.nam] += parseNum(r[valueKey]);
+            }
+        }
+    });
+
+    for (let m = 1; m <= 12; m++) {
+        const monthStr = `Tháng ${m < 10 ? '0' + m : m}`;
+        const row = [monthStr];
+        
+        years.forEach(y => {
+            const val = aggMap[m][y];
+            row.push(val);
+            totalPerYear[y] += val;
+        });
+        
+        rows.push(row);
+    }
+
+    const totalRow = ['Tổng cộng', ...years.map(y => totalPerYear[y])];
+    rows.push(totalRow);
+
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    const colWidths = [{ wch: 14 }];
+    years.forEach(() => colWidths.push({ wch: 18 }));
+    ws['!cols'] = colWidths;
+
+    return ws;
+}
+
 window.clientSideExport = async function(basePayload, currentTab) {
     const filename = currentTab === 'summary' 
         ? `bao_cao_tong_hop_${new Date().toISOString().slice(0,10)}.xlsx` 
@@ -481,7 +532,20 @@ window.clientSideExport = async function(basePayload, currentTab) {
     
     const wb = XLSX.utils.book_new();
     if (currentTab === 'summary') {
-        XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(q.grouped_records), "Tong_Hop");
+        const dfFiltered = q.detail_records || [];
+
+        // 1. Matrix sheet cho Sản lượng theo tháng x năm
+        const wsSL = buildMonthlyMatrixSheet(dfFiltered, 'tieuThu');
+        XLSX.utils.book_append_sheet(wb, wsSL, "San_Luong_Theo_Thang");
+
+        // 2. Matrix sheet cho Doanh thu theo tháng x năm
+        const wsDT = buildMonthlyMatrixSheet(dfFiltered, 'tongTien');
+        XLSX.utils.book_append_sheet(wb, wsDT, "Doanh_Thu_Theo_Thang");
+
+        // 3. Sheet thống kê gom nhóm chi tiết
+        if (q.grouped_records && q.grouped_records.length > 0) {
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(q.grouped_records), "Tong_Hop_Chi_Tiet");
+        }
     } else {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(q.detail_records), "Chi_Tiet");
     }
