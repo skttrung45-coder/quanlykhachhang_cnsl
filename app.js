@@ -437,3 +437,109 @@ window.handleFileUpload = async function() {
         }, 500);
     }
 };
+
+// Fetch from Github /input folder
+window.fetchFromInputFolder = async function(silentError = false) {
+    document.getElementById('loading-overlay').classList.remove('hidden');
+    document.getElementById('loading-overlay').classList.add('flex');
+    const loadingStatusText = document.getElementById('loading-status-text');
+    const loadingProgressBar = document.getElementById('loading-progress-bar');
+    
+    try {
+        if (loadingStatusText) loadingStatusText.innerText = 'Đang kiểm tra thư mục input trên kho lưu trữ...';
+        if (loadingProgressBar) loadingProgressBar.style.width = '10%';
+
+        const response = await fetch('input/list.json');
+        if (!response.ok) {
+            throw new Error("Không tìm thấy input/list.json (có thể chưa tải file nào lên Github).");
+        }
+        
+        const fileList = await response.json();
+        if (!Array.isArray(fileList) || fileList.length === 0) {
+            throw new Error("Thư mục input hiện tại đang trống (list.json rỗng).");
+        }
+
+        let combinedData = [];
+        
+        for (let i = 0; i < fileList.length; i++) {
+            const fileName = fileList[i];
+            if (loadingStatusText) loadingStatusText.innerText = `Đang tải file ${i + 1}/${fileList.length}: ${fileName}`;
+            if (loadingProgressBar) loadingProgressBar.style.width = `${10 + Math.round((i / fileList.length) * 80)}%`;
+            
+            const fileResponse = await fetch(`input/${fileName}`);
+            if (!fileResponse.ok) {
+                console.error(`Không thể tải file: input/${fileName}`);
+                continue;
+            }
+            const dataBuffer = await fileResponse.arrayBuffer();
+            
+            const workbook = XLSX.read(dataBuffer, {type: 'array'});
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {defval: ""});
+            
+            const mappedData = jsonData.map(r => {
+                let donViRaw = r['donVi'] || r['Đơn vị'] || r['donvi'] || "";
+                return {
+                    donVi: donViRaw.toString().trim().toUpperCase(),
+                    maKhachHang: r['maKhachHang'] || r['Mã khách hàng'],
+                    tenKhachHang: r['tenKhachHang'] || r['Tên khách hàng'],
+                    nam: r['nam'] || r['Năm'],
+                    thang: r['thang'] || r['Tháng'],
+                    maTuyenDoc: r['maTuyenDoc'] || r['Mã tuyến đọc'],
+                    maPhamVi: r['maPhamVi'] || r['Mã phạm vi'],
+                    mucDich: r['mucDich'] || r['Mục đích SD'],
+                    maDoiTuongGia: r['maDoiTuongGia'] || r['Mã đối tượng giá'],
+                    tieuThu: r['tieuThu'] || r['Tiêu thụ'] || 0,
+                    thanhTien: r['thanhTien'] || r['Thành tiền'] || 0,
+                    phiVAT: r['phiVAT'] || r['Phí VAT'] || 0,
+                    phiBVMT: r['phiBVMT'] || r['Phí BVMT'] || 0,
+                    tongTien: r['tongTien'] || r['Tổng tiền'] || 0
+                };
+            });
+            
+            combinedData = combinedData.concat(mappedData);
+        }
+
+        if (combinedData.length === 0) {
+            throw new Error("Không có dữ liệu nào được trích xuất từ các file.");
+        }
+        
+        window.allData = combinedData;
+        
+        if (loadingStatusText) loadingStatusText.innerText = 'Đang lưu vào bộ nhớ đệm (IndexedDB)...';
+        await window.saveToIDB(window.allData);
+        
+        if (loadingProgressBar) loadingProgressBar.style.width = '100%';
+        if (loadingStatusText) loadingStatusText.innerText = `Đã đồng bộ ${window.allData.length} dòng dữ liệu!`;
+        
+        const btnClear = document.getElementById('btn-clear-cache');
+        if (btnClear) btnClear.classList.remove('hidden');
+        
+        // Reset filters & fetch
+        for (let key in activeFilters) {
+            activeFilters[key] = [];
+        }
+        await fetchFilterOptions();
+        await applyFilters();
+        
+        setTimeout(() => {
+            alert(`Đã đồng bộ tự động ${fileList.length} file với tổng số ${window.allData.length} dòng dữ liệu!`);
+        }, 100);
+
+    } catch (err) {
+        console.error("Lỗi đồng bộ tự động:", err);
+        if (!silentError) {
+            alert("Đồng bộ từ thư mục input bị bỏ qua: " + err.message);
+        }
+        return false;
+    } finally {
+        setTimeout(() => {
+            document.getElementById('loading-overlay').classList.add('hidden');
+            document.getElementById('loading-overlay').classList.remove('flex');
+            if (loadingProgressBar) loadingProgressBar.style.width = '0%';
+            if (loadingStatusText) loadingStatusText.innerText = 'Đang chuẩn bị khởi động...';
+        }, 500);
+    }
+    return true;
+};

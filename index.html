@@ -1409,6 +1409,10 @@
                     console.log("Loaded data from IndexedDB:", cachedData.length, "rows.");
                     const btnClear = document.getElementById('btn-clear-cache');
                     if (btnClear) btnClear.classList.remove('hidden');
+                } else if (window.fetchFromInputFolder) {
+                    // Try fetching from input folder on Github silently
+                    const fetched = await window.fetchFromInputFolder(true);
+                    if (fetched) return; // fetchFromInputFolder already calls applyFilters
                 }
             }
 
