@@ -1037,6 +1037,7 @@
                     // 1. Detailed View Rendering
                     tableHeader.innerHTML = `
                         <tr>
+                            <th class="p-3">Tháng phát hành</th>
                             <th class="p-3">Mã KH</th>
                             <th class="p-3">Tên Khách Hàng</th>
                             <th class="p-3">Mục đích</th>
@@ -1052,7 +1053,7 @@
                     if (records.length === 0) {
                         dataRows.innerHTML = `
                             <tr>
-                                <td colspan="6" class="p-8 text-center text-slate-400">
+                                <td colspan="7" class="p-8 text-center text-slate-400">
                                     Không tìm thấy dữ liệu hóa đơn nào khớp với bộ lọc.
                                 </td>
                             </tr>
@@ -1063,7 +1064,9 @@
                     records.forEach(row => {
                         const tr = document.createElement('tr');
                         tr.className = 'hover:bg-slate-50 transition-colors duration-150';
+                        const thangStr = row.thang ? `Tháng ${row.thang < 10 ? '0' + row.thang : row.thang}${row.nam ? '/' + row.nam : ''}` : '';
                         tr.innerHTML = `
+                            <td class="p-3 text-slate-600 font-semibold whitespace-nowrap text-xs bg-slate-50/50">${thangStr}</td>
                             <td class="p-3 font-mono font-medium text-slate-700">${row.maKhachHang || ''}</td>
                             <td class="p-3 font-semibold text-slate-900">${row.tenKhachHang || ''}</td>
                             <td class="p-3 text-slate-600">${row.mucDich || ''}</td>
@@ -1197,7 +1200,7 @@
                 console.error("Lỗi khi áp dụng bộ lọc:", err);
                 dataRows.innerHTML = `
                     <tr>
-                        <td colspan="6" class="p-8 text-center text-red-500 font-medium">
+                        <td colspan="7" class="p-8 text-center text-red-500 font-medium">
                             Có lỗi xảy ra khi truy xuất dữ liệu từ máy chủ. Vui lòng kiểm tra lại.
                         </td>
                     </tr>
