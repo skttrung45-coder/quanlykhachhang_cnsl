@@ -174,7 +174,7 @@ function getUniqueValues(data, field) {
 }
 
 window.mockApiFilters = function(payload) {
-    let filtered = window.allData;
+    let filtered = window.allData || [];
     if (payload.donVi && payload.donVi.length) filtered = filtered.filter(r => payload.donVi.includes(r.donVi));
     if (payload.maTuyenDoc && payload.maTuyenDoc.length) filtered = filtered.filter(r => payload.maTuyenDoc.includes(r.maTuyenDoc));
     if (payload.maPhamVi && payload.maPhamVi.length) filtered = filtered.filter(r => payload.maPhamVi.includes(r.maPhamVi));
@@ -195,7 +195,9 @@ window.mockApiFilters = function(payload) {
 };
 
 window.mockApiQuery = function(payload) {
-    let df = window.allData;
+    let df = window.allData || [];
+    let stat_grouped = [];
+    let yoy_metadata = null;
     
     if (payload.donVi && payload.donVi.length) df = df.filter(r => payload.donVi.includes(r.donVi));
     if (payload.maTuyenDoc && payload.maTuyenDoc.length) df = df.filter(r => payload.maTuyenDoc.includes(r.maTuyenDoc));
@@ -392,7 +394,7 @@ window.mockApiQuery = function(payload) {
 };
 
 window.mockApiCustomerChanges = function(payload) {
-    let df = window.allData;
+    let df = window.allData || [];
     if (payload.donVi && payload.donVi.length) df = df.filter(r => payload.donVi.includes(r.donVi));
     
     const dfA = df.filter(r => r.nam === payload.namA && payload.thangA.includes(r.thang));
@@ -462,15 +464,18 @@ window.mockApiCustomerChanges = function(payload) {
 };
 
 window.mockApiTopVolumeChanges = function(payload) {
-    let df = window.allData;
+    let df = window.allData || [];
     if (payload.donVi && payload.donVi.length) df = df.filter(r => payload.donVi.includes(r.donVi));
     if (payload.maTuyenDoc && payload.maTuyenDoc.length) df = df.filter(r => payload.maTuyenDoc.includes(r.maTuyenDoc));
     if (payload.maPhamVi && payload.maPhamVi.length) df = df.filter(r => payload.maPhamVi.includes(r.maPhamVi));
     if (payload.mucDich && payload.mucDich.length) df = df.filter(r => payload.mucDich.includes(r.mucDich));
     if (payload.maDoiTuongGia && payload.maDoiTuongGia.length) df = df.filter(r => payload.maDoiTuongGia.includes(r.maDoiTuongGia));
 
-    const dfA = df.filter(r => r.nam === payload.namA && payload.thangA.includes(r.thang));
-    const dfB = df.filter(r => r.nam === payload.namB && payload.thangB === r.thang);
+    const thangAArr = Array.isArray(payload.thangA) ? payload.thangA : [payload.thangA];
+    const thangBArr = Array.isArray(payload.thangB) ? payload.thangB : [payload.thangB];
+
+    const dfA = df.filter(r => r.nam === payload.namA && thangAArr.includes(r.thang));
+    const dfB = df.filter(r => r.nam === payload.namB && thangBArr.includes(r.thang));
 
     const mapA = new Map();
     dfA.forEach(r => {
@@ -741,7 +746,7 @@ window.clientSideExport = async function(basePayload, currentTab) {
             namA: parseInt(document.getElementById('tg-namA').value),
             thangA: activeFilters.tg_thangA,
             namB: parseInt(document.getElementById('tg-namB').value),
-            thangB: parseInt(document.getElementById('tg-thangB').value),
+            thangB: activeFilters.tg_thangB,
             mode: document.getElementById('tg-mode').value,
             topN: parseInt(document.getElementById('tg-topN').value) || 20,
             minVolume: parseNum(document.getElementById('tg-minVolume').value) || 0,
@@ -1014,9 +1019,11 @@ window.fetchFromInputFolder = async function(silentError = false) {
         return true;
 
     } catch (err) {
-        console.error("Lỗi đồng bộ tự động:", err);
         if (!silentError) {
+            console.error("Lỗi đồng bộ tự động:", err);
             alert("Đồng bộ từ thư mục input bị bỏ qua: " + err.message);
+        } else {
+            console.warn("Đồng bộ tự động từ thư mục input bị bỏ qua (file:// protocol hoặc không tìm thấy file list.json):", err.message || err);
         }
         return false;
     } finally {
