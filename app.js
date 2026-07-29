@@ -461,6 +461,147 @@ window.mockApiCustomerChanges = function(payload) {
     };
 };
 
+window.mockApiTopVolumeChanges = function(payload) {
+    let df = window.allData;
+    if (payload.donVi && payload.donVi.length) df = df.filter(r => payload.donVi.includes(r.donVi));
+    if (payload.maTuyenDoc && payload.maTuyenDoc.length) df = df.filter(r => payload.maTuyenDoc.includes(r.maTuyenDoc));
+    if (payload.maPhamVi && payload.maPhamVi.length) df = df.filter(r => payload.maPhamVi.includes(r.maPhamVi));
+    if (payload.mucDich && payload.mucDich.length) df = df.filter(r => payload.mucDich.includes(r.mucDich));
+    if (payload.maDoiTuongGia && payload.maDoiTuongGia.length) df = df.filter(r => payload.maDoiTuongGia.includes(r.maDoiTuongGia));
+
+    const dfA = df.filter(r => r.nam === payload.namA && payload.thangA.includes(r.thang));
+    const dfB = df.filter(r => r.nam === payload.namB && payload.thangB === r.thang);
+
+    const mapA = new Map();
+    dfA.forEach(r => {
+        if (!r.maKhachHang) return;
+        if (!mapA.has(r.maKhachHang)) {
+            mapA.set(r.maKhachHang, { tieuThu: 0, tenKhachHang: r.tenKhachHang, donVi: r.donVi, mucDich: r.mucDich, maTuyenDoc: r.maTuyenDoc });
+        }
+        const item = mapA.get(r.maKhachHang);
+        item.tieuThu += parseNum(r.tieuThu);
+    });
+
+    const mapB = new Map();
+    dfB.forEach(r => {
+        if (!r.maKhachHang) return;
+        if (!mapB.has(r.maKhachHang)) {
+            mapB.set(r.maKhachHang, { tieuThu: 0, tenKhachHang: r.tenKhachHang, donVi: r.donVi, mucDich: r.mucDich, maTuyenDoc: r.maTuyenDoc });
+        }
+        const item = mapB.get(r.maKhachHang);
+        item.tieuThu += parseNum(r.tieuThu);
+    });
+
+    const allCustCodes = new Set([...mapA.keys(), ...mapB.keys()]);
+    const results = [];
+
+    const mode = payload.mode || 'increase';
+    const minVol = parseNum(payload.minVolume) || 0;
+
+    allCustCodes.forEach(code => {
+        const itemA = mapA.get(code);
+        const itemB = mapB.get(code);
+
+        const slA = itemA ? itemA.tieuThu : 0;
+        const slB = itemB ? itemB.tieuThu : 0;
+
+        const tenKH = (itemB ? itemB.tenKhachHang : '') || (itemA ? itemA.tenKhachHang : '');
+        const donVi = (itemB ? itemB.donVi : '') || (itemA ? itemA.donVi : '');
+        const mucDich = (itemB ? itemB.mucDich : '') || (itemA ? itemA.mucDich : '');
+        const maTuyenDoc = (itemB ? itemB.maTuyenDoc : '') || (itemA ? itemA.maTuyenDoc : '');
+
+        const delta = slB - slA;
+
+        if (mode === 'increase') {
+            if (delta > 0 && delta >= minVol) {
+                let pct = 0;
+                let isNew = false;
+                if (slA > 0) {
+                    pct = ((slB - slA) / slA) * 100;
+                } else {
+                    isNew = true;
+                    pct = 999999;
+                }
+                results.push({
+                    maKhachHang: code,
+                    tenKhachHang: tenKH,
+                    donVi,
+                    mucDich,
+                    maTuyenDoc,
+                    slA,
+                    slB,
+                    delta,
+                    pct,
+                    isNew
+                });
+            }
+        } else if (mode === 'decrease') {
+            const drop = slA - slB;
+            if (drop > 0 && drop >= minVol) {
+                let pct = 0;
+                if (slA > 0) {
+                    pct = ((slA - slB) / slA) * 100;
+                } else {
+                    pct = 0;
+                }
+                results.push({
+                    maKhachHang: code,
+                    tenKhachHang: tenKH,
+                    donVi,
+                    mucDich,
+                    maTuyenDoc,
+                    slA,
+                    slB,
+                    delta: -drop,
+                    drop,
+                    pct
+                });
+            }
+        }
+    });
+
+    const sortBy = payload.sortBy || 'percent';
+    if (sortBy === 'percent') {
+        results.sort((a, b) => b.pct - a.pct);
+    } else {
+        if (mode === 'increase') {
+            results.sort((a, b) => b.delta - a.delta);
+        } else {
+            results.sort((a, b) => b.drop - a.drop);
+        }
+    }
+
+    const topN = payload.isExport ? results.length : (parseInt(payload.topN) || 20);
+    const sliced = results.slice(0, topN);
+
+    let totalVolDiff = 0;
+    let sumPct = 0;
+    let maxPct = 0;
+    let countPct = 0;
+
+    results.forEach(r => {
+        const v = mode === 'increase' ? r.delta : r.drop;
+        totalVolDiff += v;
+        if (!r.isNew) {
+            sumPct += r.pct;
+            if (r.pct > maxPct) maxPct = r.pct;
+            countPct++;
+        }
+    });
+
+    const avgPct = countPct > 0 ? (sumPct / countPct) : 0;
+
+    return {
+        mode,
+        totalFound: results.length,
+        totalVolDiff,
+        avgPct,
+        maxPct,
+        records: sliced
+    };
+};
+
+
 function buildMonthlyMatrixSheet(df, valueKey) {
     let years = Array.from(new Set(df.map(r => r.nam))).filter(y => y > 0).sort((a, b) => a - b);
     if (years.length === 0) {
@@ -592,6 +733,42 @@ window.clientSideExport = async function(basePayload, currentTab) {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(changes.reinstatedCustomers), "KH_LapLai");
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(changes.cancelledCustomers), "KH_Huy");
         XLSX.writeFile(wb, "BaoCao_BienDong_KH.xlsx");
+        return;
+    }
+
+    if (currentTab === 'topgrowth') {
+        const payload = {
+            namA: parseInt(document.getElementById('tg-namA').value),
+            thangA: activeFilters.tg_thangA,
+            namB: parseInt(document.getElementById('tg-namB').value),
+            thangB: parseInt(document.getElementById('tg-thangB').value),
+            mode: document.getElementById('tg-mode').value,
+            topN: parseInt(document.getElementById('tg-topN').value) || 20,
+            minVolume: parseNum(document.getElementById('tg-minVolume').value) || 0,
+            sortBy: document.getElementById('tg-sortBy').value,
+            donVi: activeFilters.donVi,
+            maTuyenDoc: activeFilters.maTuyenDoc,
+            maPhamVi: activeFilters.maPhamVi,
+            mucDich: activeFilters.mucDich,
+            maDoiTuongGia: activeFilters.maDoiTuongGia,
+            isExport: true
+        };
+        const res = window.mockApiTopVolumeChanges(payload);
+        const exportRows = res.records.map((r, i) => ({
+            "STT": i + 1,
+            "Mã KH": r.maKhachHang,
+            "Tên Khách Hàng": r.tenKhachHang,
+            "Đơn vị": r.donVi,
+            "Mục đích SD": r.mucDich,
+            "Sản lượng Kỳ A (m³)": r.slA,
+            "Sản lượng Kỳ B (m³)": r.slB,
+            "Chênh lệch (m³)": r.delta,
+            "Tỷ lệ % Biến động": r.isNew ? "Mới (Kỳ A = 0)" : (r.pct.toFixed(2) + "%")
+        }));
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(exportRows);
+        XLSX.utils.book_append_sheet(wb, ws, payload.mode === 'increase' ? "Top_Tang_San_Luong" : "Top_Giam_San_Luong");
+        XLSX.writeFile(wb, payload.mode === 'increase' ? "BaoCao_Top_Tang_San_Luong.xlsx" : "BaoCao_Top_Giam_San_Luong.xlsx");
         return;
     }
 

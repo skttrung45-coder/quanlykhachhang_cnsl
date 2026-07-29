@@ -451,6 +451,9 @@
                         <button id="tab-custchange" onclick="switchTab('custchange')" class="px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition">
                             🔄 Biến động KH
                         </button>
+                        <button id="tab-topgrowth" onclick="switchTab('topgrowth')" class="px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition">
+                            📈 Top Tăng/Giảm SL
+                        </button>
                     </div>
                     <div class="flex items-center gap-3">
                         <div id="groupby-container" class="hidden flex items-center gap-2">
@@ -715,6 +718,144 @@
                         <p class="text-sm">Chọn 2 kỳ (Tháng/Năm) rồi nhấn <strong>"So sánh biến động"</strong> để xem kết quả.</p>
                     </div>
                 </div>
+
+                <!-- Panel: Top Volume Growth / Decrease (Top Tăng/Giảm Sản lượng) -->
+                <div id="panel-topgrowth" class="hidden p-6">
+                    <div class="bg-slate-50 rounded-xl p-5 border border-slate-200 mb-6">
+                        <h3 class="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">🔍 Thiết lập tiêu chí tìm kiếm khách hàng tăng/giảm sản lượng</h3>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-4">
+                            <!-- Kỳ A (Kỳ trước) -->
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-xs font-bold text-amber-600 mb-2">📅 KỲ TRƯỚC (A)</p>
+                                <div class="flex gap-3">
+                                    <div class="flex-1">
+                                        <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">Tháng</label>
+                                        <div class="ms-dropdown" data-field="tg_thangA">
+                                            <div class="ms-trigger" onclick="toggleDropdown('tg_thangA')">
+                                                <div class="ms-tags"><span class="ms-placeholder">Chọn tháng</span></div>
+                                                <span class="ms-arrow">▼</span>
+                                            </div>
+                                            <div class="ms-panel" id="panel-tg_thangA"></div>
+                                        </div>
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">Năm</label>
+                                        <select id="tg-namA" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"></select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Kỳ B (Kỳ sau) -->
+                            <div class="bg-white rounded-lg p-4 border border-slate-200">
+                                <p class="text-xs font-bold text-blue-600 mb-2">📅 KỲ SAU (B)</p>
+                                <div class="flex gap-3">
+                                    <div class="flex-1">
+                                        <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">Tháng</label>
+                                        <select id="tg-thangB" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"></select>
+                                    </div>
+                                    <div class="flex-1">
+                                        <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">Năm</label>
+                                        <select id="tg-namB" class="w-full p-2 border border-slate-300 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"></select>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Tùy chọn lọc biến động -->
+                            <div class="bg-white rounded-lg p-4 border border-slate-200 flex flex-col justify-between">
+                                <div>
+                                    <p class="text-xs font-bold text-indigo-600 mb-2">⚡ ĐIỀU KIỆN TÌM KIẾM</p>
+                                    <div class="grid grid-cols-2 gap-3 mb-3">
+                                        <div>
+                                            <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">Loại biến động</label>
+                                            <select id="tg-mode" onchange="onTgModeChange()" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-semibold">
+                                                <option value="increase">🚀 Tăng sản lượng</option>
+                                                <option value="decrease">📉 Giảm sản lượng</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">Số KH muốn tìm (Top N)</label>
+                                            <input type="number" id="tg-topN" value="20" min="1" max="1000" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-bold">
+                                        </div>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label id="lbl-tg-minVolume" class="block text-[10px] text-slate-500 font-semibold mb-0.5">Sản lượng tăng tối thiểu (m³)</label>
+                                            <input type="number" id="tg-minVolume" value="0" min="0" step="1" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium">
+                                        </div>
+                                        <div>
+                                            <label class="block text-[10px] text-slate-500 font-semibold mb-0.5">Sắp xếp ưu tiên theo</label>
+                                            <select id="tg-sortBy" class="w-full p-2 border border-slate-300 rounded-lg text-xs bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                                <option value="percent">Tỷ lệ % biến động nhiều nhất</option>
+                                                <option value="volume">Chênh lệch m³ nhiều nhất</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button onclick="fetchTopVolumeChanges()" class="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-semibold py-2.5 px-6 rounded-lg text-sm shadow transition-all duration-200 flex items-center gap-2">
+                            🚀 Thống kê Top Khách Hàng
+                        </button>
+                    </div>
+
+                    <!-- KPI Summary Cards -->
+                    <div id="tg-kpi" class="hidden grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p class="text-xs text-slate-500 font-semibold">TỔNG SỐ KH THỎA ĐIỀU KIỆN</p>
+                            <h4 id="tg-kpi-count" class="text-xl font-bold text-blue-800 mt-1">0</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p id="tg-kpi-vol-label" class="text-xs text-slate-500 font-semibold">TỔNG SẢN LƯỢNG TĂNG</p>
+                            <h4 id="tg-kpi-total-vol" class="text-xl font-bold text-emerald-700 mt-1">0 m³</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p class="text-xs text-slate-500 font-semibold">TỶ LỆ TĂNG/GIẢM TRUNG BÌNH</p>
+                            <h4 id="tg-kpi-avg-pct" class="text-xl font-bold text-indigo-700 mt-1">0%</h4>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                            <p class="text-xs text-slate-500 font-semibold">TỶ LỆ BIẾN ĐỘNG CAO NHẤT</p>
+                            <h4 id="tg-kpi-max-pct" class="text-xl font-bold text-purple-700 mt-1">0%</h4>
+                        </div>
+                    </div>
+
+                    <!-- Table Results -->
+                    <div id="tg-results" class="hidden bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="bg-slate-50 px-4 py-3 border-b flex justify-between items-center">
+                            <div>
+                                <h4 id="tg-table-title" class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                                    🚀 Danh Sách Khách Hàng Tăng Sản Lượng Nhiều Nhất
+                                </h4>
+                                <p id="tg-table-subtitle" class="text-xs text-slate-500 mt-0.5">Sắp xếp theo tỷ lệ % biến động dựa trên dữ liệu đã lọc</p>
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto max-h-[500px]">
+                            <table class="w-full text-left border-collapse text-sm">
+                                <thead class="bg-slate-100 text-slate-700 font-semibold border-b sticky top-0 z-10">
+                                    <tr>
+                                        <th class="p-3 text-xs">STT</th>
+                                        <th class="p-3 text-xs">Mã KH</th>
+                                        <th class="p-3 text-xs">Tên Khách Hàng</th>
+                                        <th class="p-3 text-xs">Đơn vị</th>
+                                        <th class="p-3 text-xs">Mục đích SD</th>
+                                        <th class="p-3 text-xs text-right">SL Kỳ A (m³)</th>
+                                        <th class="p-3 text-xs text-right">SL Kỳ B (m³)</th>
+                                        <th class="p-3 text-xs text-right">Chênh lệch (m³)</th>
+                                        <th class="p-3 text-xs text-right">Tỷ lệ % Biến động</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tg-rows" class="divide-y"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Placeholder -->
+                    <div id="tg-placeholder" class="text-center py-12 text-slate-400">
+                        <p class="text-4xl mb-3">📈</p>
+                        <p class="text-sm">Chọn tiêu chí và nhấn <strong>"Thống kê Top Khách Hàng"</strong> để tìm danh sách KH tăng/giảm sản lượng nhiều nhất.</p>
+                    </div>
+                </div>
             </div>
         </main>
     </div>
@@ -739,7 +880,8 @@
             maDoiTuongGia: [],
             nam: [],
             thang: [],
-            cc_thangA: []
+            cc_thangA: [],
+            tg_thangA: []
         };
 
         // Placeholder labels for each field
@@ -751,7 +893,8 @@
             maPhamVi: 'Tất cả phạm vi',
             nam: 'Tất cả các năm',
             thang: 'Tất cả các tháng',
-            cc_thangA: 'Chọn tháng'
+            cc_thangA: 'Chọn tháng',
+            tg_thangA: 'Chọn tháng'
         };
 
         // Toggle multi-select dropdown panel visibility
@@ -879,7 +1022,7 @@
             };
         }
 
-        // Switch between Detail, Summary, Charts and Customer Change tabs
+        // Switch between Detail, Summary, Charts, Customer Change and Top Growth tabs
         async function switchTab(tab) {
             currentTab = tab;
             
@@ -887,10 +1030,12 @@
             const tabSummary = document.getElementById('tab-summary');
             const tabCharts = document.getElementById('tab-charts');
             const tabCustChange = document.getElementById('tab-custchange');
+            const tabTopGrowth = document.getElementById('tab-topgrowth');
             const groupbyContainer = document.getElementById('groupby-container');
             const panelTable = document.getElementById('panel-table');
             const panelCharts = document.getElementById('panel-charts');
             const panelCustChange = document.getElementById('panel-custchange');
+            const panelTopGrowth = document.getElementById('panel-topgrowth');
 
             const activeClass = 'px-4 py-3 text-sm font-semibold border-b-2 border-blue-700 text-blue-700 transition focus:outline-none';
             const inactiveClass = 'px-4 py-3 text-sm font-semibold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition focus:outline-none';
@@ -899,11 +1044,13 @@
             tabSummary.className = inactiveClass;
             tabCharts.className = inactiveClass;
             tabCustChange.className = inactiveClass;
+            if (tabTopGrowth) tabTopGrowth.className = inactiveClass;
 
             // Hide all panels
             panelTable.classList.add('hidden');
             panelCharts.classList.add('hidden');
             panelCustChange.classList.add('hidden');
+            if (panelTopGrowth) panelTopGrowth.classList.add('hidden');
             groupbyContainer.classList.add('hidden');
 
             if (tab === 'detail') {
@@ -925,6 +1072,11 @@
                 tabCustChange.className = activeClass;
                 panelCustChange.classList.remove('hidden');
                 await populateCustChangeSelectors();
+                return; // Don't call applyFilters for this tab
+            } else if (tab === 'topgrowth') {
+                if (tabTopGrowth) tabTopGrowth.className = activeClass;
+                if (panelTopGrowth) panelTopGrowth.classList.remove('hidden');
+                await populateTopGrowthSelectors();
                 return; // Don't call applyFilters for this tab
             }
             
@@ -1181,6 +1333,11 @@
 
         // Apply filters and search database records
         async function applyFilters() {
+            if (currentTab === 'topgrowth') {
+                await fetchTopVolumeChanges();
+                return;
+            }
+
             const dataRows = document.getElementById('data-rows');
             dataRows.innerHTML = `
                 <tr>
@@ -1550,6 +1707,165 @@
                 document.getElementById('cc-new-rows').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-red-500 text-xs">Lỗi</td></tr>';
                 document.getElementById('cc-reinstated-rows').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-red-500 text-xs">Lỗi</td></tr>';
                 document.getElementById('cc-cancelled-rows').innerHTML = '<tr><td colspan="4" class="p-4 text-center text-red-500 text-xs">Lỗi</td></tr>';
+            }
+        }
+
+        // ======= TOP VOLUME GROWTH / DECREASE LOGIC =======
+        async function populateTopGrowthSelectors() {
+            try {
+                const data = await Promise.resolve(window.mockApiFilters({ donVi: [], maTuyenDoc: [], maPhamVi: [], mucDich: [], maDoiTuongGia: [], nam: [], thang: [] }));
+
+                const years = data.nam || [];
+                const months = data.thang || [];
+
+                ['tg-namA', 'tg-namB'].forEach(id => {
+                    const sel = document.getElementById(id);
+                    if (sel && sel.options.length <= 1) {
+                        sel.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+                    }
+                });
+
+                const panelThangA = document.getElementById('panel-tg_thangA');
+                if (panelThangA && panelThangA.innerHTML === '') {
+                    panelThangA.innerHTML = months.map(m => `
+                        <label>
+                            <input type="checkbox" value="${m}" onchange="onCheckboxChange('tg_thangA', this)">
+                            Tháng ${m}
+                        </label>
+                    `).join('');
+                }
+
+                ['tg-thangB'].forEach(id => {
+                    const sel = document.getElementById(id);
+                    if (sel && sel.options.length <= 1) {
+                        sel.innerHTML = months.map(m => `<option value="${m}">Tháng ${m}</option>`).join('');
+                    }
+                });
+
+                if (months.length >= 2) {
+                    if (activeFilters.tg_thangA.length === 0) {
+                        activeFilters.tg_thangA.push(months[0]);
+                        updateTriggerDisplay('tg_thangA');
+                        const cb = document.querySelector(`#panel-tg_thangA input[value="${months[0]}"]`);
+                        if (cb) cb.checked = true;
+                    }
+                    const selB = document.getElementById('tg-thangB');
+                    if (selB && !selB.value) selB.value = months[1];
+                }
+            } catch (err) {
+                console.error('Lỗi populate TopGrowth selectors:', err);
+            }
+        }
+
+        function onTgModeChange() {
+            const mode = document.getElementById('tg-mode').value;
+            const lblMinVol = document.getElementById('lbl-tg-minVolume');
+            const tableTitle = document.getElementById('tg-table-title');
+            const kpiVolLabel = document.getElementById('tg-kpi-vol-label');
+            if (mode === 'increase') {
+                if (lblMinVol) lblMinVol.innerText = 'Sản lượng tăng tối thiểu (m³)';
+                if (tableTitle) tableTitle.innerHTML = '🚀 Danh Sách Khách Hàng Tăng Sản Lượng Nhiều Nhất';
+                if (kpiVolLabel) kpiVolLabel.innerText = 'TỔNG SẢN LƯỢNG TĂNG';
+            } else {
+                if (lblMinVol) lblMinVol.innerText = 'Sản lượng giảm tối thiểu (m³)';
+                if (tableTitle) tableTitle.innerHTML = '📉 Danh Sách Khách Hàng Giảm Sản Lượng Nhiều Nhất';
+                if (kpiVolLabel) kpiVolLabel.innerText = 'TỔNG SẢN LƯỢNG GIẢM';
+            }
+        }
+
+        async function fetchTopVolumeChanges() {
+            const namA = parseInt(document.getElementById('tg-namA').value);
+            const thangA = activeFilters.tg_thangA;
+            const namB = parseInt(document.getElementById('tg-namB').value);
+            const thangB = parseInt(document.getElementById('tg-thangB').value);
+            const mode = document.getElementById('tg-mode').value;
+            const topN = parseInt(document.getElementById('tg-topN').value) || 20;
+            const minVolume = safeParseNum(document.getElementById('tg-minVolume').value);
+            const sortBy = document.getElementById('tg-sortBy').value;
+
+            if (!namA || thangA.length === 0 || !namB || !thangB) {
+                alert('Vui lòng chọn đầy đủ Tháng và Năm cho cả 2 kỳ!');
+                return;
+            }
+
+            const payload = {
+                namA,
+                thangA,
+                namB,
+                thangB,
+                mode,
+                topN,
+                minVolume,
+                sortBy,
+                donVi: [...activeFilters.donVi],
+                maTuyenDoc: [...activeFilters.maTuyenDoc],
+                maPhamVi: [...activeFilters.maPhamVi],
+                mucDich: [...activeFilters.mucDich],
+                maDoiTuongGia: [...activeFilters.maDoiTuongGia]
+            };
+
+            document.getElementById('tg-placeholder').classList.add('hidden');
+            document.getElementById('tg-kpi').classList.remove('hidden');
+            document.getElementById('tg-kpi').style.display = 'grid';
+            document.getElementById('tg-results').classList.remove('hidden');
+
+            const tbody = document.getElementById('tg-rows');
+            tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-slate-400">Đang thống kê dữ liệu...</td></tr>';
+
+            try {
+                const data = await Promise.resolve(window.mockApiTopVolumeChanges(payload));
+
+                document.getElementById('tg-kpi-count').innerText = new Intl.NumberFormat('vi-VN').format(data.totalFound);
+                document.getElementById('tg-kpi-total-vol').innerText = formatM3(data.totalVolDiff);
+                document.getElementById('tg-kpi-avg-pct').innerText = data.avgPct.toFixed(1) + '%';
+                document.getElementById('tg-kpi-max-pct').innerText = data.maxPct.toFixed(1) + '%';
+
+                if (data.records.length === 0) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="9" class="p-8 text-center text-slate-400 text-xs">
+                                Không tìm thấy khách hàng nào thỏa mãn điều kiện ${mode === 'increase' ? 'tăng' : 'giảm'} sản lượng tối thiểu ${minVolume} m³.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                tbody.innerHTML = '';
+                data.records.forEach((r, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = 'hover:bg-slate-50 transition-colors duration-150 text-xs';
+
+                    const isInc = mode === 'increase';
+                    const deltaStr = (r.delta > 0 ? '+' : '') + new Intl.NumberFormat('vi-VN').format(r.delta) + ' m³';
+                    const deltaClass = r.delta > 0 ? 'text-emerald-600 font-bold' : (r.delta < 0 ? 'text-red-600 font-bold' : 'text-slate-600');
+
+                    let pctBadge = '';
+                    if (r.isNew) {
+                        pctBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300">🆕 Mới (Kỳ A = 0)</span>`;
+                    } else {
+                        const badgeColor = isInc ? 'bg-emerald-100 text-emerald-800 border-emerald-200' : 'bg-red-100 text-red-800 border-red-200';
+                        const sign = isInc ? '+' : '-';
+                        pctBadge = `<span class="px-2 py-0.5 rounded text-[10px] font-bold border ${badgeColor}">${sign}${r.pct.toFixed(1)}%</span>`;
+                    }
+
+                    tr.innerHTML = `
+                        <td class="p-3 text-slate-500 font-medium">${idx + 1}</td>
+                        <td class="p-3 font-mono font-bold text-slate-800">${r.maKhachHang || ''}</td>
+                        <td class="p-3 font-semibold text-slate-900">${r.tenKhachHang || ''}</td>
+                        <td class="p-3 text-slate-600">${r.donVi || ''}</td>
+                        <td class="p-3 text-slate-600">${r.mucDich || ''}</td>
+                        <td class="p-3 text-right font-medium text-slate-700">${new Intl.NumberFormat('vi-VN').format(r.slA)} m³</td>
+                        <td class="p-3 text-right font-medium text-blue-700">${new Intl.NumberFormat('vi-VN').format(r.slB)} m³</td>
+                        <td class="p-3 text-right ${deltaClass}">${deltaStr}</td>
+                        <td class="p-3 text-right">${pctBadge}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+            } catch (err) {
+                console.error('Lỗi fetchTopVolumeChanges:', err);
+                tbody.innerHTML = '<tr><td colspan="9" class="p-8 text-center text-red-500 text-xs">Đã xảy ra lỗi khi tính toán số liệu.</td></tr>';
             }
         }
 
