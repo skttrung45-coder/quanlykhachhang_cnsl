@@ -67,6 +67,46 @@ window.clearIDB = async function() {
     }
 };
 
+window.saveGithubMetaToIDB = async function(meta) {
+    try {
+        const db = await window.dbPromise;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readwrite');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.put(meta, 'githubMeta');
+            request.onsuccess = () => resolve();
+            request.onerror = (e) => reject(e.target.error);
+        });
+    } catch (err) {
+        console.error("Lỗi khi lưu GitHub meta:", err);
+    }
+};
+
+window.loadGithubMetaFromIDB = async function() {
+    try {
+        const db = await window.dbPromise;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([STORE_NAME], 'readonly');
+            const store = transaction.objectStore(STORE_NAME);
+            const request = store.get('githubMeta');
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = (e) => reject(e.target.error);
+        });
+    } catch (err) {
+        return null;
+    }
+};
+
+window.updateGithubSyncUIStatus = function(statusMsg, isError = false) {
+    const el = document.getElementById('github-sync-status');
+    if (el) {
+        el.innerText = statusMsg;
+        el.className = isError 
+            ? 'text-[11px] text-red-500 font-medium mt-1 block' 
+            : 'text-[11px] text-emerald-600 font-medium mt-1 flex items-center gap-1 block';
+    }
+};
+
 // Helper utilities for data parsing
 function getRowVal(r, keys) {
     for (let k of keys) {
@@ -931,38 +971,122 @@ window.handleFileUpload = async function() {
     }
 };
 
-// Fetch from Github /input folder
-window.fetchFromInputFolder = async function(silentError = false) {
-    window.showLoading('Đang kiểm tra thư mục input trên kho lưu trữ...');
+// Fetch from Github /input folder & Sync
+window.syncDataFromGithub = async function(forceRefresh = false) {
+    try {
+        window.updateGithubSyncUIStatus('🔄 Đang kiểm tra dữ liệu trên máy chủ GitHub...');
+        
+        const listUrl = `input/list.json?t=${Date.now()}`;
+        const response = await fetch(listUrl, { cache: 'no-store' });
+        
+        if (!response.ok) {
+            throw new Error("Không thể kết nối danh sách input/list.json trên máy chủ GitHub.");
+        }
+        
+        const fileList = await response.json();
+        if (!Array.isArray(fileList) || fileList.length === 0) {
+            throw new Error("Danh sách file input/list.json trên GitHub đang rỗng.");
+        }
+
+        const currentSignature = JSON.stringify(fileList);
+        
+        if (!forceRefresh && window.loadGithubMetaFromIDB && window.loadFromIDB) {
+            const cachedMeta = await window.loadGithubMetaFromIDB();
+            const cachedData = await window.loadFromIDB();
+            
+            if (cachedMeta && cachedMeta.signature === currentSignature && cachedData && cachedData.length > 0) {
+                console.log("Dữ liệu GitHub chưa thay đổi. Tải dữ liệu từ IndexedDB cache...");
+                window.allData = cachedData;
+                
+                const btnClear = document.getElementById('btn-clear-cache');
+                if (btnClear) btnClear.classList.remove('hidden');
+                
+                for (let key in activeFilters) {
+                    activeFilters[key] = [];
+                }
+                await fetchFilterOptions();
+                await applyFilters();
+                
+                window.updateGithubSyncUIStatus(`🟢 GitHub: ${fileList.length} file (${window.allData.length.toLocaleString('vi-VN')} dòng)`);
+                return true;
+            }
+        }
+        
+        const success = await window.fetchFromInputFolder(false, fileList);
+        if (success) {
+            if (window.saveGithubMetaToIDB) {
+                await window.saveGithubMetaToIDB({
+                    signature: currentSignature,
+                    lastSynced: new Date().toISOString(),
+                    fileCount: fileList.length,
+                    rowCount: window.allData ? window.allData.length : 0
+                });
+            }
+            window.updateGithubSyncUIStatus(`🟢 GitHub: ${fileList.length} file (${window.allData.length.toLocaleString('vi-VN')} dòng)`);
+        }
+        return success;
+
+    } catch (err) {
+        console.warn("Không thể tải trực tiếp từ GitHub:", err.message || err);
+        
+        if (window.loadFromIDB) {
+            const cachedData = await window.loadFromIDB();
+            if (cachedData && cachedData.length > 0) {
+                window.allData = cachedData;
+                const btnClear = document.getElementById('btn-clear-cache');
+                if (btnClear) btnClear.classList.remove('hidden');
+                
+                for (let key in activeFilters) {
+                    activeFilters[key] = [];
+                }
+                await fetchFilterOptions();
+                await applyFilters();
+                
+                window.updateGithubSyncUIStatus(`⚠️ Offline / Bộ nhớ tạm: ${window.allData.length.toLocaleString('vi-VN')} dòng`, true);
+                return true;
+            }
+        }
+        
+        window.updateGithubSyncUIStatus(`❌ Lỗi kết nối GitHub: ${err.message}`, true);
+        return false;
+    }
+};
+
+window.fetchFromInputFolder = async function(silentError = false, preloadedList = null) {
+    window.showLoading('Đang tải dữ liệu từ máy chủ GitHub...');
     const loadingStatusText = document.getElementById('loading-status-text');
     const loadingProgressBar = document.getElementById('loading-progress-bar');
     
     try {
         if (loadingProgressBar) loadingProgressBar.style.width = '10%';
 
-        const response = await fetch('input/list.json');
-        if (!response.ok) {
-            throw new Error("Không tìm thấy input/list.json (có thể chưa tải file nào lên Github).");
+        let fileList = preloadedList;
+        if (!fileList) {
+            const response = await fetch(`input/list.json?t=${Date.now()}`, { cache: 'no-store' });
+            if (!response.ok) {
+                throw new Error("Không tìm thấy input/list.json trên GitHub.");
+            }
+            fileList = await response.json();
         }
         
-        const fileList = await response.json();
         if (!Array.isArray(fileList) || fileList.length === 0) {
             throw new Error("Thư mục input hiện tại đang trống (list.json rỗng).");
         }
 
         let combinedData = [];
+        const timestamp = Date.now();
         
         for (let i = 0; i < fileList.length; i++) {
             const relPath = fileList[i];
             const { year: forcedNam, month: forcedThang } = extractYearAndMonthFromPath(relPath);
 
-            if (loadingStatusText) loadingStatusText.innerText = `Đang tải file ${i + 1}/${fileList.length}: ${relPath}`;
+            if (loadingStatusText) loadingStatusText.innerText = `Đang tải từ GitHub (${i + 1}/${fileList.length}): ${relPath}`;
             if (loadingProgressBar) loadingProgressBar.style.width = `${10 + Math.round(((i + 1) / fileList.length) * 80)}%`;
             
-            const fetchUrl = `input/${relPath.split('/').map(encodeURIComponent).join('/')}`;
-            const fileResponse = await fetch(fetchUrl);
+            const fetchUrl = `input/${relPath.split('/').map(encodeURIComponent).join('/')}?t=${timestamp}`;
+            const fileResponse = await fetch(fetchUrl, { cache: 'no-store' });
             if (!fileResponse.ok) {
-                console.error(`Không thể tải file: ${fetchUrl}`);
+                console.error(`Không thể tải file từ GitHub: ${fetchUrl}`);
                 continue;
             }
             const dataBuffer = await fileResponse.arrayBuffer();
@@ -1000,30 +1124,25 @@ window.fetchFromInputFolder = async function(silentError = false) {
         await window.saveToIDB(window.allData);
         
         if (loadingProgressBar) loadingProgressBar.style.width = '100%';
-        if (loadingStatusText) loadingStatusText.innerText = `Đã đồng bộ ${window.allData.length} dòng dữ liệu!`;
+        if (loadingStatusText) loadingStatusText.innerText = `Đã đồng bộ ${window.allData.length.toLocaleString('vi-VN')} dòng dữ liệu!`;
         
         const btnClear = document.getElementById('btn-clear-cache');
         if (btnClear) btnClear.classList.remove('hidden');
         
-        // Reset filters & fetch
         for (let key in activeFilters) {
             activeFilters[key] = [];
         }
         await fetchFilterOptions();
         await applyFilters();
-        
-        setTimeout(() => {
-            alert(`Đã đồng bộ tự động ${fileList.length} file với tổng số ${window.allData.length} dòng dữ liệu!`);
-        }, 100);
 
         return true;
 
     } catch (err) {
         if (!silentError) {
-            console.error("Lỗi đồng bộ tự động:", err);
-            alert("Đồng bộ từ thư mục input bị bỏ qua: " + err.message);
+            console.error("Lỗi đồng bộ dữ liệu GitHub:", err);
+            alert("Lỗi tải dữ liệu từ máy chủ GitHub: " + err.message);
         } else {
-            console.warn("Đồng bộ tự động từ thư mục input bị bỏ qua (file:// protocol hoặc không tìm thấy file list.json):", err.message || err);
+            console.warn("Bỏ qua đồng bộ dữ liệu từ GitHub:", err.message || err);
         }
         return false;
     } finally {

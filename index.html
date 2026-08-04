@@ -325,17 +325,28 @@
         <!-- Cột bên trái: Bộ lọc tiêu chí động -->
         <aside id="filter-sidebar" class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col gap-4 h-fit">
             <!-- Thư mục chứa tệp Excel -->
-            <!-- Nạp dữ liệu từ file Excel -->
+            <!-- Nạp dữ liệu từ máy chủ GitHub & Excel -->
             <div class="border-b pb-3 mb-1">
                 <h3 class="text-xs font-bold text-slate-500 mb-2 flex items-center gap-1.5">
-                    📂 NẠP DỮ LIỆU (EXCEL)
+                    🌐 DỮ LIỆU MÁY CHỦ GITHUB
                 </h3>
                 <div class="flex flex-col gap-2">
-                    <input type="file" id="file-upload" multiple accept=".xlsx, .xls, .xlsb" class="text-xs p-1 border border-slate-300 rounded-lg bg-slate-50 w-full" />
-                    <button onclick="handleFileUpload()" id="btn-load-file" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm w-full">
-                        Nạp File
+                    <button onclick="window.syncDataFromGithub && window.syncDataFromGithub(true)" id="btn-sync-github" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm w-full flex items-center justify-center gap-1.5">
+                        🔄 Đồng bộ Dữ liệu từ GitHub
                     </button>
-                    <button onclick="clearCache()" id="btn-clear-cache" class="bg-red-500 hover:bg-red-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm w-full hidden">
+                    <p id="github-sync-status" class="text-[11px] text-emerald-600 font-medium mt-0.5 hidden"></p>
+                    
+                    <details class="mt-2 text-xs">
+                        <summary class="cursor-pointer text-slate-500 font-semibold hover:text-slate-700 py-1">📂 Nạp file phụ từ máy cá nhân</summary>
+                        <div class="pt-2 flex flex-col gap-2">
+                            <input type="file" id="file-upload" multiple accept=".xlsx, .xls, .xlsb" class="text-xs p-1 border border-slate-300 rounded-lg bg-slate-50 w-full" />
+                            <button onclick="handleFileUpload()" id="btn-load-file" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm w-full">
+                                Nạp File Thủ Công
+                            </button>
+                        </div>
+                    </details>
+                    
+                    <button onclick="clearCache()" id="btn-clear-cache" class="bg-red-500 hover:bg-red-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm w-full mt-1 hidden">
                         Xóa Dữ liệu đã lưu
                     </button>
                 </div>
@@ -2278,7 +2289,13 @@
                 return;
             }
 
-            // Check IndexedDB first
+            // Always prioritize syncing unified data from GitHub server first
+            if (window.syncDataFromGithub) {
+                const synced = await window.syncDataFromGithub(false);
+                if (synced) return;
+            }
+
+            // Fallback to IndexedDB if offline or GitHub fetch failed
             if (window.loadFromIDB) {
                 const cachedData = await window.loadFromIDB();
                 if (cachedData && cachedData.length > 0) {
@@ -2286,10 +2303,6 @@
                     console.log("Loaded data from IndexedDB:", cachedData.length, "rows.");
                     const btnClear = document.getElementById('btn-clear-cache');
                     if (btnClear) btnClear.classList.remove('hidden');
-                } else if (window.fetchFromInputFolder) {
-                    // Try fetching from input folder on Github silently
-                    const fetched = await window.fetchFromInputFolder(true);
-                    if (fetched) return; // fetchFromInputFolder already calls applyFilters
                 }
             }
 
