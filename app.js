@@ -971,16 +971,29 @@ window.handleFileUpload = async function() {
     }
 };
 
+// Helper to construct absolute URL to input files on server
+function getGitHubInputPath(relPath = '') {
+    let href = window.location.href.split('?')[0].split('#')[0];
+    if (href.endsWith('.html') || href.endsWith('.htm')) {
+        href = href.substring(0, href.lastIndexOf('/') + 1);
+    } else if (!href.endsWith('/')) {
+        href += '/';
+    }
+    const target = relPath ? `input/${relPath.split('/').map(encodeURIComponent).join('/')}` : 'input/list.json';
+    return `${href}${target}`;
+}
+
 // Fetch from Github /input folder & Sync
 window.syncDataFromGithub = async function(forceRefresh = false) {
     try {
         window.updateGithubSyncUIStatus('🔄 Đang kiểm tra dữ liệu trên máy chủ GitHub...');
         
-        const listUrl = `input/list.json?t=${Date.now()}`;
+        const listUrl = `${getGitHubInputPath()}?t=${Date.now()}`;
+        console.log("Fetching GitHub file list from:", listUrl);
         const response = await fetch(listUrl, { cache: 'no-store' });
         
         if (!response.ok) {
-            throw new Error("Không thể kết nối danh sách input/list.json trên máy chủ GitHub.");
+            throw new Error(`Không thể kết nối input/list.json (Mã HTTP: ${response.status}). URL: ${listUrl}`);
         }
         
         const fileList = await response.json();
@@ -1062,9 +1075,10 @@ window.fetchFromInputFolder = async function(silentError = false, preloadedList 
 
         let fileList = preloadedList;
         if (!fileList) {
-            const response = await fetch(`input/list.json?t=${Date.now()}`, { cache: 'no-store' });
+            const listUrl = `${getGitHubInputPath()}?t=${Date.now()}`;
+            const response = await fetch(listUrl, { cache: 'no-store' });
             if (!response.ok) {
-                throw new Error("Không tìm thấy input/list.json trên GitHub.");
+                throw new Error(`Không tìm thấy input/list.json trên GitHub (Mã HTTP: ${response.status}).`);
             }
             fileList = await response.json();
         }
@@ -1083,10 +1097,10 @@ window.fetchFromInputFolder = async function(silentError = false, preloadedList 
             if (loadingStatusText) loadingStatusText.innerText = `Đang tải từ GitHub (${i + 1}/${fileList.length}): ${relPath}`;
             if (loadingProgressBar) loadingProgressBar.style.width = `${10 + Math.round(((i + 1) / fileList.length) * 80)}%`;
             
-            const fetchUrl = `input/${relPath.split('/').map(encodeURIComponent).join('/')}?t=${timestamp}`;
+            const fetchUrl = `${getGitHubInputPath(relPath)}?t=${timestamp}`;
             const fileResponse = await fetch(fetchUrl, { cache: 'no-store' });
             if (!fileResponse.ok) {
-                console.error(`Không thể tải file từ GitHub: ${fetchUrl}`);
+                console.error(`Không thể tải file từ GitHub: ${fetchUrl} (Mã HTTP ${fileResponse.status})`);
                 continue;
             }
             const dataBuffer = await fileResponse.arrayBuffer();

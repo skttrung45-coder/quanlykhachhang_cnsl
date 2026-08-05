@@ -1955,6 +1955,12 @@
         window.addEventListener('DOMContentLoaded', () => {
             const progressBar = document.getElementById('loading-progress-bar');
             if (progressBar) progressBar.style.width = '100%';
+            
+            // Automatically start syncing data from GitHub server on page load immediately
+            if (window.syncDataFromGithub) {
+                window.syncDataFromGithub(false).catch(e => console.warn("Auto sync background error:", e));
+            }
+
             setTimeout(() => {
                 if (window.hideLoading) {
                     window.hideLoading();
@@ -2093,6 +2099,8 @@
                 msgEl.classList.remove('hidden');
                 document.getElementById('form-auth-register').reset();
                 updateAdminPendingBadge();
+                checkAuthStatus();
+                initializeMainApp();
             } else {
                 msgEl.className = 'p-3 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg font-medium';
                 msgEl.innerText = res.message;
@@ -2283,16 +2291,17 @@
         }
 
         async function initializeMainApp() {
-            // Check user authentication status first
-            if (!checkAuthStatus()) {
-                console.log("Chưa đăng nhập, hiển thị màn hình Auth.");
-                return;
-            }
+            const isAuth = checkAuthStatus();
 
-            // Always prioritize syncing unified data from GitHub server first
+            // Prioritize syncing unified data from GitHub server
             if (window.syncDataFromGithub) {
                 const synced = await window.syncDataFromGithub(false);
-                if (synced) return;
+                if (synced && isAuth) return;
+            }
+
+            if (!isAuth) {
+                console.log("Chưa đăng nhập, hiển thị màn hình Auth.");
+                return;
             }
 
             // Fallback to IndexedDB if offline or GitHub fetch failed
