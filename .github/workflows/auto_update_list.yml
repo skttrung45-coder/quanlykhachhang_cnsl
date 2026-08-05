@@ -1,0 +1,31 @@
+name: Auto Update Input List
+
+on:
+  push:
+    paths:
+      - 'input/**'
+  workflow_dispatch:
+
+jobs:
+  update-list:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Generate input/list.json
+        run: python update_list.py
+
+      - name: Commit and push if changed
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add input/list.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Auto update input/list.json" && git push)
